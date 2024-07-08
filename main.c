@@ -9,21 +9,19 @@
 #define Y_INICIAL 300
 #define VELOCIDADE 20
 #define TAMANHO_QUADRADO 20
-#define TAMANHO_OBSTACULO 20
 
 void movimentacao(int *pX, int *pY);
 
 int main(void)
 {
     int posX = X_INICIAL, posY = Y_INICIAL;
-    int i, j;
     int quadradoNaTela = 1;
     int *pX, *pY;
 
     pX = &posX;
     pY = &posY;
 
-    InitWindow(LARGURA, ALTURA, "Quadrado");
+    InitWindow(LARGURA, ALTURA, "Infmon");
     SetTargetFPS(60);
 
     srand(time(NULL));
@@ -31,17 +29,11 @@ int main(void)
     while (!WindowShouldClose() && quadradoNaTela)
     {
         movimentacao(pX, pY);
+
         if (posX == 0 - TAMANHO_QUADRADO || posY == 0 - TAMANHO_QUADRADO || posX == ALTURA || posY == LARGURA)
             quadradoNaTela = 0;
 
         BeginDrawing();
-
-        for (i = 0; i < 30; i++)
-        {
-            for (j = 0; j < 30; j++)
-            {
-            }
-        }
 
         ClearBackground(RAYWHITE);
         DrawRectangle(posX, posY, TAMANHO_QUADRADO, TAMANHO_QUADRADO, GREEN);
@@ -54,12 +46,12 @@ int main(void)
 
 void movimentacao(int *pX, int *pY)
 {
-    if (IsKeyPressed(KEY_RIGHT))
+    if (IsKeyDown(KEY_RIGHT))
         *pX += VELOCIDADE;
-    if (IsKeyPressed(KEY_LEFT))
+    if (IsKeyDown(KEY_LEFT))
         *pX -= VELOCIDADE;
-    if (IsKeyPressed(KEY_UP))
+    if (IsKeyDown(KEY_UP))
         *pY -= VELOCIDADE;
-    if (IsKeyPressed(KEY_DOWN))
+    if (IsKeyDown(KEY_DOWN))
         *pY += VELOCIDADE;
 }
