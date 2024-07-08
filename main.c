@@ -7,7 +7,7 @@
 #define LARGURA 1200
 #define X_INICIAL 300
 #define Y_INICIAL 300
-#define VELOCIDADE 20
+#define VELOCIDADE 3
 #define TAMANHO_QUADRADO 20
 
 void movimentacao(int *pX, int *pY);
@@ -30,7 +30,7 @@ int main(void)
     {
         movimentacao(pX, pY);
 
-        if (posX == 0 - TAMANHO_QUADRADO || posY == 0 - TAMANHO_QUADRADO || posX == ALTURA || posY == LARGURA)
+        if (posX == 0 - TAMANHO_QUADRADO || posY == 0 - TAMANHO_QUADRADO || posX == LARGURA || posY == ALTURA)
             quadradoNaTela = 0;
 
         BeginDrawing();
