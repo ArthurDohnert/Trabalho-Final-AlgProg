@@ -1,91 +1,154 @@
 #include "raylib.h"
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
-#define ALTURA 600
-#define LARGURA 1200
-#define X_INICIAL 300
-#define Y_INICIAL 300
-#define VELOCIDADE 20
-#define TAMANHO_QUADRADO 20
+#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 1200
+#define STARTING_POSITION_X 300
+#define STARTING_POSITION_Y 300
+#define MOVEMENT_SPEED 5
+#define SQUARE_WIDTH 20
+#define TRUE 1
+#define FALSE 0
 
-void movimentacao(int *pX, int *pY, char mapa[60][30]);
+// PROTÓTIPOS DE FUNÇÕES
+//*********************************************************************************************************************
+// Função que desenha o mapa
+void drawMap(char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
 
+// Função que atualiza a posição do personagem
+void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
+//*********************************************************************************************************************
+
+// ESTRUTURAS
+//*********************************************************************************************************************
+// Estrutura que define as propriedades de uma entidade
+struct entity
+{
+    int posX;
+    int posY;
+};
+//*********************************************************************************************************************
+
+// MAIN
+//=====================================================================================================================
 int main(void)
 {
-    int posX = X_INICIAL, posY = Y_INICIAL;
+    // Definindo estruturas e suas variáveis
+    //--------------------------------------------------------------------------------------------------------------------
+
+    struct entity player;
+    player.posX = STARTING_POSITION_X;
+    player.posY = STARTING_POSITION_Y;
+
+    //---------------------------------------------------------------------------------------------------------------------
+
+    // VARIÁVEIS
+    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     int i, j;
-    int *pX, *pY;
-    char mapa[60][30];
+    char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]; // Gerador de mapa provisório
 
-    pX = &posX;
-    pY = &posY;
+    // Variáveis de "estado de jogo"
+    //---------------------------------------------------------------------------------------------------------------------
 
-    InitWindow(LARGURA, ALTURA, "Infmon");
+    int exploring_map = TRUE;   // Determina se o jogador pode se mover pelo mapa
+    int game_is_paused = FALSE; // Determina se o jogo está pausado
+
+    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Infmon");
     SetTargetFPS(60);
-    srand(time(NULL));
 
-    for (i = 0; i < 60; i++)
+    // Gera o mapa
+    //---------------------------------------------------------------------------------------------------------------------
+    SetRandomSeed(time(NULL));
+    for (i = 0; i < SCREEN_WIDTH / SQUARE_WIDTH; i++)
     {
-        for (j = 0; j < 30; j++)
+        for (j = 0; j < SCREEN_HEIGHT / SQUARE_WIDTH; j++)
         {
-            if (i == 0 || i == 59 || j == 0 || j == 29)
-            {
-                mapa[i][j] = 'W';
-            }
-            else if (rand() % 5 == 1)
-            {
-                mapa[i][j] = 'G';
-            }
+            if (i == 0 || i == SCREEN_WIDTH / SQUARE_WIDTH - 1 || j == 0 || j == SCREEN_HEIGHT / SQUARE_WIDTH - 1)
+                map[i][j] = 'W';
+            else if (GetRandomValue(1, 5) == 1)
+                map[i][j] = 'G';
             else
-            {
-                mapa[i][j] = ' ';
-            }
+                map[i][j] = ' ';
         }
     }
+    //---------------------------------------------------------------------------------------------------------------------
 
+    // Vínculo principal do jogo
+    // #####################################################################################################################
     while (!WindowShouldClose())
     {
-        movimentacao(pX, pY, mapa);
-
-        BeginDrawing();
-        for (i = 0; i < 60; i++)
+        // Exploração
+        //---------------------------------------------------------------------------------------------------------------------
+        if (exploring_map)
         {
-            for (j = 0; j < 30; j++)
+            if (IsKeyPressed(KEY_TAB))
             {
-                if (mapa[i][j] == 'G')
-                {
-                    DrawRectangle(i * 20, j * 20, 20, 20, DARKGREEN);
-                }
-                else if (mapa[i][j] == 'W')
-                {
-                    DrawRectangle(i * 20, j * 20, 20, 20, BLACK);
-                }
-                else if (mapa[i][j] == ' ')
-                {
-                    DrawRectangle(i * 20, j * 20, 20, 20, GREEN);
-                }
+                game_is_paused = TRUE;
+                exploring_map = FALSE;
             }
+            movePlayer(&player.posX, &player.posY, map);
+            BeginDrawing();
+            drawMap(map);
+            ClearBackground(RAYWHITE);
+            DrawRectangle(player.posX, player.posY, SQUARE_WIDTH, SQUARE_WIDTH, RED);
+            DrawText("Press TAB to open pause menu", 20, 0, 20, WHITE);
+            EndDrawing();
         }
 
-        ClearBackground(RAYWHITE);
-        DrawRectangle(posX, posY, TAMANHO_QUADRADO, TAMANHO_QUADRADO, RED);
-        EndDrawing();
-    }
+        //---------------------------------------------------------------------------------------------------------------------
+        // Jogo pausado
+        //---------------------------------------------------------------------------------------------------------------------
 
-    CloseWindow();
+        else if (game_is_paused)
+        {
+            if (IsKeyPressed(KEY_TAB))
+            {
+                game_is_paused = FALSE;
+                exploring_map = TRUE;
+            }
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawText("PAUSED", 400, 300, 50, WHITE);
+            EndDrawing();
+        }
+        //---------------------------------------------------------------------------------------------------------------------
+    }
+    // #####################################################################################################################
+    CloseWindow(); // Fecha o jogo
     return 0;
 }
 
-void movimentacao(int *pX, int *pY, char mapa[60][30])
+//=====================================================================================================================
+// FUNÇÕES CUSTOMIZADAS
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void drawMap(char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
 {
-    if (IsKeyPressed(KEY_RIGHT) && mapa[(*pX + VELOCIDADE) / 20][*pY / 20] != 'W')
-        *pX += VELOCIDADE;
-    if (IsKeyPressed(KEY_LEFT) && mapa[(*pX - VELOCIDADE) / 20][*pY / 20] != 'W')
-        *pX -= VELOCIDADE;
-    if (IsKeyPressed(KEY_UP) && mapa[*pX / 20][(*pY - VELOCIDADE) / 20] != 'W')
-        *pY -= VELOCIDADE;
-    if (IsKeyPressed(KEY_DOWN) && mapa[*pX / 20][(*pY + VELOCIDADE) / 20] != 'W')
-        *pY += VELOCIDADE;
+    int i, j;
+    for (i = 0; i < SCREEN_WIDTH / SQUARE_WIDTH; i++)
+    {
+        for (j = 0; j < SCREEN_HEIGHT / SQUARE_WIDTH; j++)
+        {
+            if (map[i][j] == 'G')
+                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, DARKGREEN);
+            else if (map[i][j] == 'W')
+                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, BLACK);
+            else if (map[i][j] == ' ')
+                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
+        }
+    }
+}
+
+void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
+{
+    if (IsKeyDown(KEY_RIGHT) && map[(*pX + SQUARE_WIDTH) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+        *pX += MOVEMENT_SPEED;
+    if (IsKeyDown(KEY_LEFT) && map[(*pX - MOVEMENT_SPEED) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+        *pX -= MOVEMENT_SPEED;
+    if (IsKeyDown(KEY_UP) && map[*pX / SQUARE_WIDTH][(*pY - MOVEMENT_SPEED) / SQUARE_WIDTH] != 'W')
+        *pY -= MOVEMENT_SPEED;
+    if (IsKeyDown(KEY_DOWN) && map[*pX / SQUARE_WIDTH][(*pY + SQUARE_WIDTH) / SQUARE_WIDTH] != 'W')
+        *pY += MOVEMENT_SPEED;
 }
