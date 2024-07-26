@@ -1,32 +1,41 @@
 #include "raylib.h"
 #include <stdio.h>
 #include <time.h>
-#define SCREEN_HEIGHT 600
-#define SCREEN_WIDTH 1200
+#define SCREEN_HEIGHT 960
+#define SCREEN_WIDTH 1920
 #define STARTING_POSITION_X 300
 #define STARTING_POSITION_Y 300
 #define MOVEMENT_SPEED 5
-#define SQUARE_WIDTH 20
+#define SQUARE_WIDTH 32
+#define ENTITY_SIZE 32
 #define TRUE 1
 #define FALSE 0
-
-// PROTÓTIPOS DE FUNÇÕES
-//*********************************************************************************************************************
-// Função que desenha o mapa
-void drawMap(char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
-
-// Função que atualiza a posição do personagem
-void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
-//*********************************************************************************************************************
 
 // ESTRUTURAS
 //*********************************************************************************************************************
 // Estrutura que define as propriedades de uma entidade
-struct entity
+typedef struct
 {
     int posX;
     int posY;
-};
+    Texture2D texture;
+} Entity;
+
+// Estrutura do mapa da grama
+typedef struct
+{
+    Texture2D floor;
+    Texture2D bush;
+} Maps;
+//*********************************************************************************************************************
+
+// PROTÓTIPOS DE FUNÇÕES
+//*********************************************************************************************************************
+// Função que desenha o mapa
+void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
+
+// Função que atualiza a posição do personagem
+void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
 //*********************************************************************************************************************
 
 // MAIN
@@ -35,8 +44,8 @@ int main(void)
 {
     // Definindo estruturas e suas variáveis
     //--------------------------------------------------------------------------------------------------------------------
-
-    struct entity player;
+    Maps grass;
+    Entity player;
     player.posX = STARTING_POSITION_X;
     player.posY = STARTING_POSITION_Y;
 
@@ -58,6 +67,13 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Infmon");
     SetTargetFPS(60);
+
+    // Define texturas
+    //--------------------------------------------------------------------------------------------------------------------
+    Texture2D wallTexture = LoadTexture("sprites/Wall(AllMaps).png");
+    grass.floor = LoadTexture("sprites/TerrenoDeGrama.png");
+    grass.bush = LoadTexture("sprites/TerrenoDeTransicaoGrama.png");
+    player.texture = LoadTexture("sprites/MainChar.png");
 
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
@@ -91,9 +107,9 @@ int main(void)
             }
             movePlayer(&player.posX, &player.posY, map);
             BeginDrawing();
-            drawMap(map);
+            drawMap(&grass, wallTexture, map);
             ClearBackground(RAYWHITE);
-            DrawRectangle(player.posX, player.posY, SQUARE_WIDTH, SQUARE_WIDTH, RED);
+            DrawTexture(player.texture, player.posX, player.posY, WHITE);
             DrawText("Press TAB to open pause menu", 20, 0, 20, WHITE);
             EndDrawing();
         }
@@ -116,6 +132,12 @@ int main(void)
         }
         //---------------------------------------------------------------------------------------------------------------------
     }
+
+    UnloadTexture(player.texture);
+    UnloadTexture(grass.floor);
+    UnloadTexture(grass.bush);
+    UnloadTexture(wallTexture);
+
     // #####################################################################################################################
     CloseWindow(); // Fecha o jogo
     return 0;
@@ -124,31 +146,37 @@ int main(void)
 //=====================================================================================================================
 // FUNÇÕES CUSTOMIZADAS
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void drawMap(char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
+void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
 {
     int i, j;
     for (i = 0; i < SCREEN_WIDTH / SQUARE_WIDTH; i++)
     {
         for (j = 0; j < SCREEN_HEIGHT / SQUARE_WIDTH; j++)
         {
-            if (map[i][j] == 'G')
-                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, DARKGREEN);
-            else if (map[i][j] == 'W')
-                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, BLACK);
-            else if (map[i][j] == ' ')
-                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
+            switch (map[i][j])
+            {
+            case 'W':
+                DrawTexture(wall, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
+                break;
+            case ' ':
+                DrawTexture(m->floor, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
+                break;
+            case 'G':
+                DrawTexture(m->floor, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE); // TODO: corrigir bug e mudar de 'floor' para 'bush'
+                break;
+            }
         }
     }
 }
 
 void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
 {
-    if (IsKeyDown(KEY_RIGHT) && map[(*pX + SQUARE_WIDTH) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+    if (IsKeyDown(KEY_RIGHT) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
         *pX += MOVEMENT_SPEED;
     if (IsKeyDown(KEY_LEFT) && map[(*pX - MOVEMENT_SPEED) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
         *pX -= MOVEMENT_SPEED;
     if (IsKeyDown(KEY_UP) && map[*pX / SQUARE_WIDTH][(*pY - MOVEMENT_SPEED) / SQUARE_WIDTH] != 'W')
         *pY -= MOVEMENT_SPEED;
-    if (IsKeyDown(KEY_DOWN) && map[*pX / SQUARE_WIDTH][(*pY + SQUARE_WIDTH) / SQUARE_WIDTH] != 'W')
+    if (IsKeyDown(KEY_DOWN) && map[*pX / SQUARE_WIDTH][(*pY + ENTITY_SIZE) / SQUARE_WIDTH] != 'W')
         *pY += MOVEMENT_SPEED;
 }
