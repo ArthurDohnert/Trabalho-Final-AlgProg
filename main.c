@@ -1,6 +1,8 @@
 #include "raylib.h"
+
 #include <stdio.h>
 #include <time.h>
+
 #define SCREEN_HEIGHT 960
 #define SCREEN_WIDTH 1920
 #define STARTING_POSITION_X 300
@@ -21,7 +23,7 @@ typedef struct
     Texture2D texture;
 } Entity;
 
-// Estrutura do mapa da grama
+// Estrutura dos mapas (podemos declarar um novo mapa e reutilizar as texturas com base nos mapas obtidos   )
 typedef struct
 {
     Texture2D floor;
@@ -62,11 +64,14 @@ int main(void)
 
     int exploring_map = TRUE;   // Determina se o jogador pode se mover pelo mapa
     int game_is_paused = FALSE; // Determina se o jogo está pausado
+    int exit_requested = FALSE;
+    int must_exit = FALSE; // Determina se o jogador quer fechar o jogo
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Infmon");
     SetTargetFPS(60);
+    SetExitKey(KEY_NULL);
 
     // Define texturas
     //--------------------------------------------------------------------------------------------------------------------
@@ -94,17 +99,46 @@ int main(void)
 
     // Vínculo principal do jogo
     // #####################################################################################################################
-    while (!WindowShouldClose())
+    while (!(WindowShouldClose() || must_exit))
     {
+        //---------------------------------------------------------------------------------------------------------------------
+        // Pergunta se o jogador quer sair. Precisa ter preferência na sequência de ifs
+        //---------------------------------------------------------------------------------------------------------------------
+        if (exit_requested)
+        {
+            if (IsKeyPressed(KEY_ESCAPE))
+            {
+                exit_requested = FALSE;
+            }
+            if (IsKeyPressed(KEY_ENTER))
+            {
+                must_exit = TRUE;
+                exit_requested = FALSE;
+            }
+
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawRectangle(0, 100, SCREEN_WIDTH, SCREEN_HEIGHT - 200, BLACK);
+            DrawText("Você deseja sair sem salvar?", 80, 180, 30, WHITE);
+            DrawText("Pressione enter para sair", 80, 300, 30, WHITE);
+            EndDrawing();
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------
         // Exploração
         //---------------------------------------------------------------------------------------------------------------------
-        if (exploring_map)
+        else if (exploring_map)
         {
             if (IsKeyPressed(KEY_TAB))
             {
                 game_is_paused = TRUE;
                 exploring_map = FALSE;
             }
+            if (IsKeyPressed(KEY_ESCAPE))
+            {
+                exit_requested = TRUE;
+            }
+
             movePlayer(&player.posX, &player.posY, map);
             BeginDrawing();
             drawMap(&grass, wallTexture, map);
@@ -120,17 +154,20 @@ int main(void)
 
         else if (game_is_paused)
         {
-            if (IsKeyPressed(KEY_TAB))
+            if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
             {
                 game_is_paused = FALSE;
                 exploring_map = TRUE;
+            }
+            if (IsKeyPressed(KEY_Q))
+            {
+                exit_requested = TRUE;
             }
             BeginDrawing();
             ClearBackground(BLACK);
             DrawText("PAUSED", 400, 300, 50, WHITE);
             EndDrawing();
         }
-        //---------------------------------------------------------------------------------------------------------------------
     }
 
     UnloadTexture(player.texture);
