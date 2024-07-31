@@ -7,19 +7,38 @@
 #define SCREEN_WIDTH 1920
 #define STARTING_POSITION_X 300
 #define STARTING_POSITION_Y 300
-#define MOVEMENT_SPEED 5
+#define MOVEMENT_SPEED 3
 #define SQUARE_WIDTH 32
 #define ENTITY_SIZE 32
+#define ROWS 30
+#define COLUMNS 60
+#define MAX_INFMONS 3
 #define TRUE 1
 #define FALSE 0
 
+/*NOVO: Estrutura 'Infmon', flag de combate, funções pra gerar encontro aleatório, constantes pra matriz mapa,
+função "movePlayer" agora retorna um inteiro (temporário, pra testar o encontro aleatório)
+*/
+
 // ESTRUTURAS
 //*********************************************************************************************************************
+// Estrutura do infmon
+typedef struct
+{
+    int current_health_value;
+    int max_health;
+    char infmon_type;
+    int level;
+    int current_xp;
+    int level_up_xp_threshold;
+} Infmon;
+
 // Estrutura que define as propriedades de uma entidade
 typedef struct
 {
     int posX;
     int posY;
+    Infmon mon[MAX_INFMONS];
     Texture2D texture;
 } Entity;
 
@@ -33,11 +52,20 @@ typedef struct
 
 // PROTÓTIPOS DE FUNÇÕES
 //*********************************************************************************************************************
+
+// Função que determina se jogador está passando por zona de encontro aleatório
+int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
+
+// Função que gera encontro aleatório
+int randomEncounter();
+
+void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste);
+
 // Função que desenha o mapa
-void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
+void drawMap(Maps *m, Texture2D wall, char map[COLUMNS][ROWS]);
 
 // Função que atualiza a posição do personagem
-void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]);
+int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS]);
 //*********************************************************************************************************************
 
 // MAIN
@@ -56,8 +84,8 @@ int main(void)
     // VARIÁVEIS
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    int i, j;
-    char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH]; // Gerador de mapa provisório
+    int mapNum = 1;
+    char map[COLUMNS][ROWS]; // Gerador de mapa provisório
 
     // Variáveis de "estado de jogo"
     //---------------------------------------------------------------------------------------------------------------------
@@ -66,6 +94,7 @@ int main(void)
     int game_is_paused = FALSE; // Determina se o jogo está pausado
     int exit_requested = FALSE;
     int must_exit = FALSE; // Determina se o jogador quer fechar o jogo
+    int in_combat = FALSE; // Determina se está em combate
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -83,18 +112,7 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    for (i = 0; i < SCREEN_WIDTH / SQUARE_WIDTH; i++)
-    {
-        for (j = 0; j < SCREEN_HEIGHT / SQUARE_WIDTH; j++)
-        {
-            if (i == 0 || i == SCREEN_WIDTH / SQUARE_WIDTH - 1 || j == 0 || j == SCREEN_HEIGHT / SQUARE_WIDTH - 1)
-                map[i][j] = 'W';
-            else if (GetRandomValue(1, 5) == 1)
-                map[i][j] = 'G';
-            else
-                map[i][j] = ' ';
-        }
-    }
+    changeMap(map, mapNum, &must_exit);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -138,6 +156,17 @@ int main(void)
             {
                 exit_requested = TRUE;
             }
+            if (movePlayer(&player.posX, &player.posY, map))
+            {
+                if (movingThroughGrass(player.posX, player.posY, map))
+                {
+                    if (randomEncounter())
+                    {
+                        exploring_map = FALSE;
+                        in_combat = TRUE;
+                    }
+                }
+            }
 
             movePlayer(&player.posX, &player.posY, map);
             BeginDrawing();
@@ -148,7 +177,29 @@ int main(void)
             EndDrawing();
         }
 
-        //---------------------------------------------------------------------------------------------------------------------
+        //--------------------------------------------------------------------------------------------------------------------
+
+        //    Em combate
+
+        //--------------------------------------------------------------------------------------------------------------------
+
+        else if (in_combat)
+        {
+
+            if (IsKeyPressed(KEY_R))
+            {
+                in_combat = FALSE;
+                exploring_map = TRUE;
+            }
+
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawText("COMBAT", 400, 300, 50, WHITE);
+            EndDrawing();
+        }
+
+        //--------------------------------------------------------------------------------------------------------------------
+
         // Jogo pausado
         //---------------------------------------------------------------------------------------------------------------------
 
@@ -183,12 +234,59 @@ int main(void)
 //=====================================================================================================================
 // FUNÇÕES CUSTOMIZADAS
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
+int randomEncounter()
+{
+    int battle_start = FALSE;
+
+    if (GetRandomValue(1, 100) == 1)
+        battle_start = TRUE;
+
+    return battle_start;
+}
+
+int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
+{
+
+    int in_grass = FALSE;
+
+    if (map[(pX / SQUARE_WIDTH)][(pY / SQUARE_WIDTH)] == 'G')
+        in_grass = TRUE;
+
+    return in_grass;
+}
+
+void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste)
 {
     int i, j;
-    for (i = 0; i < SCREEN_WIDTH / SQUARE_WIDTH; i++)
+    FILE *arqMap;
+
+    arqMap = fopen("maps/Mapa1.txt", "r");
+
+    if (arqMap == NULL)
     {
-        for (j = 0; j < SCREEN_HEIGHT / SQUARE_WIDTH; j++)
+        *teste = 1;
+    }
+    else
+    {
+        for (i = 0; i < COLUMNS; i++)
+        {
+            for (j = 0; j < ROWS; j++)
+            {
+                if ((map[i][j] = getc(arqMap)) == '\n')
+                    j--;
+            }
+        }
+    }
+
+    fclose(arqMap);
+}
+
+void drawMap(Maps *m, Texture2D wall, char map[COLUMNS][ROWS])
+{
+    int i, j;
+    for (i = 0; i < COLUMNS; i++)
+    {
+        for (j = 0; j < ROWS; j++)
         {
             switch (map[i][j])
             {
@@ -196,8 +294,8 @@ void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCRE
                 DrawTexture(wall, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
                 break;
             case ' ':
-                DrawTexture(m->floor, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
-                break;
+            case 'J':
+            case 'E':
             case 'G':
                 DrawTexture(m->floor, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE); // TODO: corrigir bug e mudar de 'floor' para 'bush'
                 break;
@@ -206,14 +304,29 @@ void drawMap(Maps *m, Texture2D wall, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCRE
     }
 }
 
-void movePlayer(int *pX, int *pY, char map[SCREEN_WIDTH / SQUARE_WIDTH][SCREEN_HEIGHT / SQUARE_WIDTH])
+int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS])
 {
+    int moving = FALSE;
     if (IsKeyDown(KEY_RIGHT) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+    {
         *pX += MOVEMENT_SPEED;
+        moving = TRUE;
+    }
     if (IsKeyDown(KEY_LEFT) && map[(*pX - MOVEMENT_SPEED) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+    {
         *pX -= MOVEMENT_SPEED;
+        moving = TRUE;
+    }
     if (IsKeyDown(KEY_UP) && map[*pX / SQUARE_WIDTH][(*pY - MOVEMENT_SPEED) / SQUARE_WIDTH] != 'W')
+    {
         *pY -= MOVEMENT_SPEED;
+        moving = TRUE;
+    }
     if (IsKeyDown(KEY_DOWN) && map[*pX / SQUARE_WIDTH][(*pY + ENTITY_SIZE) / SQUARE_WIDTH] != 'W')
+    {
         *pY += MOVEMENT_SPEED;
+        moving = TRUE;
+    }
+
+    return moving;
 }
