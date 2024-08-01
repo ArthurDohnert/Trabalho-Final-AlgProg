@@ -54,18 +54,18 @@ typedef struct
 //*********************************************************************************************************************
 
 // Função que determina se jogador está passando por zona de encontro aleatório
-int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
+int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS]);
 
 // Função que gera encontro aleatório
 int randomEncounter();
 
-void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste);
+void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste);
 
 // Função que desenha o mapa
-void drawMap(Maps *m, Texture2D wall, char map[COLUMNS][ROWS]);
+void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS]);
 
 // Função que atualiza a posição do personagem
-int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS]);
+int movePlayer(int *pX, int *pY, char map[ROWS][COLUMNS]);
 //*********************************************************************************************************************
 
 // MAIN
@@ -85,7 +85,7 @@ int main(void)
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     int mapNum = 1;
-    char map[COLUMNS][ROWS]; // Gerador de mapa provisório
+    char map[ROWS][COLUMNS]; // Gerador de mapa provisório
 
     // Variáveis de "estado de jogo"
     //---------------------------------------------------------------------------------------------------------------------
@@ -178,9 +178,7 @@ int main(void)
         }
 
         //--------------------------------------------------------------------------------------------------------------------
-
         //    Em combate
-
         //--------------------------------------------------------------------------------------------------------------------
 
         else if (in_combat)
@@ -199,7 +197,6 @@ int main(void)
         }
 
         //--------------------------------------------------------------------------------------------------------------------
-
         // Jogo pausado
         //---------------------------------------------------------------------------------------------------------------------
 
@@ -244,7 +241,7 @@ int randomEncounter()
     return battle_start;
 }
 
-int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
+int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS])
 {
 
     int in_grass = FALSE;
@@ -255,12 +252,12 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
     return in_grass;
 }
 
-void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste)
+void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste)
 {
     int i, j;
     FILE *arqMap;
 
-    arqMap = fopen("maps/Mapa1.txt", "r");
+    arqMap = fopen("maps/Mapa3.txt", "r");
 
     if (arqMap == NULL)
     {
@@ -268,9 +265,9 @@ void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste)
     }
     else
     {
-        for (i = 0; i < COLUMNS; i++)
+        for (i = 0; i < ROWS; i++)
         {
-            for (j = 0; j < ROWS; j++)
+            for (j = 0; j < COLUMNS; j++)
             {
                 if ((map[i][j] = getc(arqMap)) == '\n')
                     j--;
@@ -281,30 +278,32 @@ void changeMap(char map[COLUMNS][ROWS], int numMap, int *teste)
     fclose(arqMap);
 }
 
-void drawMap(Maps *m, Texture2D wall, char map[COLUMNS][ROWS])
+void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS])
 {
     int i, j;
-    for (i = 0; i < COLUMNS; i++)
+    for (i = 0; i < ROWS; i++)
     {
-        for (j = 0; j < ROWS; j++)
+        for (j = 0; j < COLUMNS; j++)
         {
             switch (map[i][j])
             {
             case 'W':
-                DrawTexture(wall, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
+                DrawTexture(wall, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
                 break;
             case ' ':
             case 'J':
             case 'E':
+                DrawRectangle(j * SQUARE_WIDTH, i * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
+                break;
             case 'G':
-                DrawTexture(m->floor, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE); // TODO: corrigir bug e mudar de 'floor' para 'bush'
+                DrawTexture(m->floor, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE); // TODO: corrigir bug e mudar de 'floor' para 'bush'
                 break;
             }
         }
     }
 }
 
-int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS])
+int movePlayer(int *pX, int *pY, char map[ROWS][COLUMNS])
 {
     int moving = FALSE;
     if (IsKeyDown(KEY_RIGHT) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
