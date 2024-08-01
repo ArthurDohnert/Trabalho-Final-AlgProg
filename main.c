@@ -90,7 +90,8 @@ int main(void)
     // Variáveis de "estado de jogo"
     //---------------------------------------------------------------------------------------------------------------------
 
-    int exploring_map = TRUE;   // Determina se o jogador pode se mover pelo mapa
+    int main_menu = TRUE;
+    int exploring_map = FALSE;  // Determina se o jogador pode se mover pelo mapa
     int game_is_paused = FALSE; // Determina se o jogo está pausado
     int exit_requested = FALSE;
     int must_exit = FALSE; // Determina se o jogador quer fechar o jogo
@@ -145,6 +146,35 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         // Exploração
         //---------------------------------------------------------------------------------------------------------------------
+        else if (main_menu)
+        {
+            if (IsKeyPressed(KEY_C))
+            {
+                // TODO: loadGame()
+                main_menu = FALSE;
+                exploring_map = TRUE;
+            }
+            if (IsKeyPressed(KEY_N))
+            {
+                // TODO: newGame()
+            }
+            if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
+            {
+                exit_requested = TRUE;
+            }
+
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+            DrawText("INFMON  !", SCREEN_WIDTH / 2 - 140, 180, 50, WHITE);
+            DrawText("-1", SCREEN_WIDTH / 2 + 60, 165, 35, WHITE);
+            DrawText("Pressione C para carregar seu jogo", SCREEN_WIDTH / 2 - 500, 300, 50, WHITE);
+            DrawText("Pressione N para criar um novo jogo", SCREEN_WIDTH / 2 - 500, 400, 50, WHITE);
+            DrawText("Pressione Q para fechar o jogo", SCREEN_WIDTH / 2 - 450, 500, 50, WHITE);
+
+            EndDrawing();
+        }
+
         else if (exploring_map)
         {
             if (IsKeyPressed(KEY_TAB))
@@ -257,7 +287,7 @@ void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste)
     int i, j;
     FILE *arqMap;
 
-    arqMap = fopen("maps/Mapa3.txt", "r");
+    arqMap = fopen("maps/Mapa1.txt", "r");
 
     if (arqMap == NULL)
     {
