@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 #define SCREEN_HEIGHT 960
 #define SCREEN_WIDTH 1920
@@ -15,10 +16,6 @@
 #define MAX_INFMONS 3
 #define TRUE 1
 #define FALSE 0
-
-/*NOVO: Estrutura 'Infmon', flag de combate, funções pra gerar encontro aleatório, constantes pra matriz mapa,
-função "movePlayer" agora retorna um inteiro (temporário, pra testar o encontro aleatório)
-*/
 
 // ESTRUTURAS
 //*********************************************************************************************************************
@@ -69,33 +66,38 @@ typedef struct
 } SaveInfo;
 
 //*********************************************************************************************************************
-
 // PROTÓTIPOS DE FUNÇÕES
 //*********************************************************************************************************************
 
-void changeMap(char map[ROWS][COLUMNS], int numMap);
+// recarrega o mapa diferente na matriz map
+void changeMap(char map[COLUMNS][ROWS], int numMap);
 
+// confirma se o player realmente quer sair
 void confirmExit(GameInfo *game);
 
+// faz o menu principal
 void mainMenu(GameInfo *game);
 
+// controla a pause
 void pauseGame(GameInfo *game);
 
-void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[ROWS][COLUMNS]);
+// exploracao
+void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
 
+// combate
 void combat(GameInfo *game);
 
 // Função que desenha o mapa
-void drawMap(Maps *m, char map[ROWS][COLUMNS]);
+void drawMap(Maps *m, char map[COLUMNS][ROWS]);
 
 // Função que determina se jogador está passando por zona de encontro aleatório
-int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS]);
+int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
 
 // Função que gera encontro aleatório
 int randomEncounter();
 
 // Função que atualiza a posição do personagem
-int movePlayer(int *pX, int *pY, char map[ROWS][COLUMNS]);
+int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS]);
 //*********************************************************************************************************************
 
 // MAIN
@@ -123,8 +125,8 @@ int main(void)
     // VARIÁVEIS
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    int mapNum = 1;
-    char map[ROWS][COLUMNS]; // Gerador de mapa provisório
+    int mapNum = 3;
+    char map[COLUMNS][ROWS]; // Gerador de mapa provisório
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -135,8 +137,8 @@ int main(void)
     // Define texturas
     //--------------------------------------------------------------------------------------------------------------------
     grass.wall = LoadTexture("sprites/Wall(AllMaps).png");
-    grass.floor = LoadTexture("sprites/TerrenoDeGrama.png");
-    grass.bush = LoadTexture("sprites/TerrenoDeTransicaoGrama.png");
+    grass.bush = LoadTexture("sprites/TerrenoDeGrama.png");
+    grass.floor = LoadTexture("sprites/TerrenoDeTransicaoGrama.png");
     player.texture = LoadTexture("sprites/MainChar.png");
 
     // Gera o mapa
@@ -201,6 +203,47 @@ int main(void)
     return 0;
 }
 
+//=====================================================================================================================
+// FUNÇÕES CUSTOMIZADAS
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// recarrega o mapa diferente na matriz map
+void changeMap(char map[COLUMNS][ROWS], int numMap)
+{
+    int i, j;
+    int transpose[ROWS][COLUMNS];
+    char numStr[5];
+    char fileName[20] = "maps/Mapa";
+    FILE *arqMap;
+
+    sprintf(numStr, "%d", numMap);
+
+    strcat(fileName, numStr);
+    strcat(fileName, ".txt");
+
+    arqMap = fopen(fileName, "r");
+
+    if (arqMap == NULL)
+    {
+    }
+    else
+    {
+        for (i = 0; i < ROWS; i++)
+        {
+            for (j = 0; j < COLUMNS; j++)
+            {
+                if ((transpose[i][j] = getc(arqMap)) == '\n')
+                    j--;
+
+                map[j][i] = transpose[i][j];
+            }
+        }
+    }
+
+    fclose(arqMap);
+}
+
+// confirma se o player realmente quer sair
 void confirmExit(GameInfo *game)
 {
     if (IsKeyPressed(KEY_ESCAPE))
@@ -221,6 +264,7 @@ void confirmExit(GameInfo *game)
     EndDrawing();
 }
 
+// faz o menu principal
 void mainMenu(GameInfo *game)
 {
     if (IsKeyPressed(KEY_C))
@@ -249,13 +293,14 @@ void mainMenu(GameInfo *game)
     EndDrawing();
 }
 
+// controla o pause
 void pauseGame(GameInfo *game)
 {
     if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
     {
         game->game_is_paused = FALSE;
     }
-    if (IsKeyPressed(KEY_Q))
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
     {
         game->exit_requested = TRUE;
     }
@@ -265,7 +310,8 @@ void pauseGame(GameInfo *game)
     EndDrawing();
 }
 
-void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[ROWS][COLUMNS])
+// exploracao
+void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS])
 {
     if (IsKeyPressed(KEY_TAB))
     {
@@ -295,6 +341,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[ROWS][COLUMN
     EndDrawing();
 }
 
+// combate
 void combat(GameInfo *game)
 {
     if (IsKeyPressed(KEY_R))
@@ -308,9 +355,32 @@ void combat(GameInfo *game)
     EndDrawing();
 }
 
-//=====================================================================================================================
-// FUNÇÕES CUSTOMIZADAS
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// função que desenha o mapa
+void drawMap(Maps *m, char map[COLUMNS][ROWS])
+{
+    int i, j;
+    for (i = 0; i < COLUMNS; i++)
+    {
+        for (j = 0; j < ROWS; j++)
+        {
+            switch (map[i][j])
+            {
+            case 'W':
+                DrawTexture(m->wall, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
+                break;
+            case ' ':
+            case 'J':
+            case 'E':
+                DrawRectangle(i * SQUARE_WIDTH, j * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
+                break;
+            case 'G':
+                DrawTexture(m->bush, i * SQUARE_WIDTH, j * SQUARE_WIDTH, WHITE);
+                break;
+            }
+        }
+    }
+}
+
 int randomEncounter()
 {
     int battle_start = FALSE;
@@ -321,7 +391,7 @@ int randomEncounter()
     return battle_start;
 }
 
-int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS])
+int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
 {
 
     int in_grass = FALSE;
@@ -332,57 +402,7 @@ int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS])
     return in_grass;
 }
 
-void changeMap(char map[ROWS][COLUMNS], int numMap)
-{
-    int i, j;
-    FILE *arqMap;
-
-    arqMap = fopen("maps/Mapa1.txt", "r");
-
-    if (arqMap == NULL)
-    {
-    }
-    else
-    {
-        for (i = 0; i < ROWS; i++)
-        {
-            for (j = 0; j < COLUMNS; j++)
-            {
-                if ((map[i][j] = getc(arqMap)) == '\n')
-                    j--;
-            }
-        }
-    }
-
-    fclose(arqMap);
-}
-
-void drawMap(Maps *m, char map[ROWS][COLUMNS])
-{
-    int i, j;
-    for (i = 0; i < ROWS; i++)
-    {
-        for (j = 0; j < COLUMNS; j++)
-        {
-            switch (map[i][j])
-            {
-            case 'W':
-                DrawTexture(m->wall, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
-                break;
-            case ' ':
-            case 'J':
-            case 'E':
-                DrawRectangle(j * SQUARE_WIDTH, i * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
-                break;
-            case 'G':
-                DrawTexture(m->floor, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
-                break;
-            }
-        }
-    }
-}
-
-int movePlayer(int *pX, int *pY, char map[ROWS][COLUMNS])
+int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS])
 {
     int moving = FALSE;
     if (IsKeyDown(KEY_RIGHT) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
