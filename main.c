@@ -47,22 +47,52 @@ typedef struct
 {
     Texture2D floor;
     Texture2D bush;
+    Texture2D wall;
 } Maps;
+
+// guarda todas as informaçoes do estado do jogo
+typedef struct
+{
+    int game_is_paused; // Determina se o jogo está pausado
+    int exit_requested;
+    int must_exit;      // Determina se o jogador quer fechar o jogo
+    int game_situation; // 0: main menu, 1: exploração, 2: combate
+
+} GameInfo;
+
+// acumula todas as informações que serao passadas pro arquivo de save
+typedef struct
+{
+    Entity Player_info;
+    int mapNum;
+
+} SaveInfo;
+
 //*********************************************************************************************************************
 
 // PROTÓTIPOS DE FUNÇÕES
 //*********************************************************************************************************************
+
+void changeMap(char map[ROWS][COLUMNS], int numMap);
+
+void confirmExit(GameInfo *game);
+
+void mainMenu(GameInfo *game);
+
+void pauseGame(GameInfo *game);
+
+void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[ROWS][COLUMNS]);
+
+void combat(GameInfo *game);
+
+// Função que desenha o mapa
+void drawMap(Maps *m, char map[ROWS][COLUMNS]);
 
 // Função que determina se jogador está passando por zona de encontro aleatório
 int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS]);
 
 // Função que gera encontro aleatório
 int randomEncounter();
-
-void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste);
-
-// Função que desenha o mapa
-void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS]);
 
 // Função que atualiza a posição do personagem
 int movePlayer(int *pX, int *pY, char map[ROWS][COLUMNS]);
@@ -74,10 +104,19 @@ int main(void)
 {
     // Definindo estruturas e suas variáveis
     //--------------------------------------------------------------------------------------------------------------------
+    GameInfo game;
     Maps grass;
     Entity player;
     player.posX = STARTING_POSITION_X;
     player.posY = STARTING_POSITION_Y;
+
+    // Variáveis de "estado de jogo"
+    //---------------------------------------------------------------------------------------------------------------------
+
+    game.game_is_paused = FALSE;
+    game.exit_requested = FALSE;
+    game.must_exit = FALSE;
+    game.game_situation = 0; // inicia na tela de menu
 
     //---------------------------------------------------------------------------------------------------------------------
 
@@ -87,16 +126,6 @@ int main(void)
     int mapNum = 1;
     char map[ROWS][COLUMNS]; // Gerador de mapa provisório
 
-    // Variáveis de "estado de jogo"
-    //---------------------------------------------------------------------------------------------------------------------
-
-    int main_menu = TRUE;
-    int exploring_map = FALSE;  // Determina se o jogador pode se mover pelo mapa
-    int game_is_paused = FALSE; // Determina se o jogo está pausado
-    int exit_requested = FALSE;
-    int must_exit = FALSE; // Determina se o jogador quer fechar o jogo
-    int in_combat = FALSE; // Determina se está em combate
-
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Infmon");
@@ -105,7 +134,7 @@ int main(void)
 
     // Define texturas
     //--------------------------------------------------------------------------------------------------------------------
-    Texture2D wallTexture = LoadTexture("sprites/Wall(AllMaps).png");
+    grass.wall = LoadTexture("sprites/Wall(AllMaps).png");
     grass.floor = LoadTexture("sprites/TerrenoDeGrama.png");
     grass.bush = LoadTexture("sprites/TerrenoDeTransicaoGrama.png");
     player.texture = LoadTexture("sprites/MainChar.png");
@@ -113,149 +142,170 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    changeMap(map, mapNum, &must_exit);
+    changeMap(map, mapNum);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
     // #####################################################################################################################
-    while (!(WindowShouldClose() || must_exit))
+    while (!(WindowShouldClose() || game.must_exit))
     {
         //---------------------------------------------------------------------------------------------------------------------
         // Pergunta se o jogador quer sair. Precisa ter preferência na sequência de ifs
         //---------------------------------------------------------------------------------------------------------------------
-        if (exit_requested)
+        if (game.exit_requested)
         {
-            if (IsKeyPressed(KEY_ESCAPE))
-            {
-                exit_requested = FALSE;
-            }
-            if (IsKeyPressed(KEY_ENTER))
-            {
-                must_exit = TRUE;
-                exit_requested = FALSE;
-            }
+            confirmExit(&game);
+        }
 
-            BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawRectangle(0, 100, SCREEN_WIDTH, SCREEN_HEIGHT - 200, BLACK);
-            DrawText("Você deseja sair sem salvar?", 80, 180, 30, WHITE);
-            DrawText("Pressione enter para sair", 80, 300, 30, WHITE);
-            EndDrawing();
+        //---------------------------------------------------------------------------------------------------------------------
+        // Main menu
+        //---------------------------------------------------------------------------------------------------------------------
+        else if (game.game_situation == 0)
+        {
+            mainMenu(&game);
+        }
+
+        //--------------------------------------------------------------------------------------------------------------------
+        // Jogo pausado
+        //---------------------------------------------------------------------------------------------------------------------
+        else if (game.game_is_paused)
+        {
+            pauseGame(&game);
         }
 
         //---------------------------------------------------------------------------------------------------------------------
         // Exploração
         //---------------------------------------------------------------------------------------------------------------------
-        else if (main_menu)
+        else if (game.game_situation == 1)
         {
-            if (IsKeyPressed(KEY_C))
-            {
-                // TODO: loadGame()
-                main_menu = FALSE;
-                exploring_map = TRUE;
-            }
-            if (IsKeyPressed(KEY_N))
-            {
-                // TODO: newGame()
-            }
-            if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
-            {
-                exit_requested = TRUE;
-            }
-
-            BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
-            DrawText("INFMON  !", SCREEN_WIDTH / 2 - 140, 180, 50, WHITE);
-            DrawText("-1", SCREEN_WIDTH / 2 + 60, 165, 35, WHITE);
-            DrawText("Pressione C para carregar seu jogo", SCREEN_WIDTH / 2 - 500, 300, 50, WHITE);
-            DrawText("Pressione N para criar um novo jogo", SCREEN_WIDTH / 2 - 500, 400, 50, WHITE);
-            DrawText("Pressione Q para fechar o jogo", SCREEN_WIDTH / 2 - 450, 500, 50, WHITE);
-
-            EndDrawing();
-        }
-
-        else if (exploring_map)
-        {
-            if (IsKeyPressed(KEY_TAB))
-            {
-                game_is_paused = TRUE;
-                exploring_map = FALSE;
-            }
-            if (IsKeyPressed(KEY_ESCAPE))
-            {
-                exit_requested = TRUE;
-            }
-            if (movePlayer(&player.posX, &player.posY, map))
-            {
-                if (movingThroughGrass(player.posX, player.posY, map))
-                {
-                    if (randomEncounter())
-                    {
-                        exploring_map = FALSE;
-                        in_combat = TRUE;
-                    }
-                }
-            }
-
-            movePlayer(&player.posX, &player.posY, map);
-            BeginDrawing();
-            drawMap(&grass, wallTexture, map);
-            ClearBackground(RAYWHITE);
-            DrawTexture(player.texture, player.posX, player.posY, WHITE);
-            DrawText("Press TAB to open pause menu", 20, 0, 20, WHITE);
-            EndDrawing();
+            exploring(&game, &player, &grass, map);
         }
 
         //--------------------------------------------------------------------------------------------------------------------
         //    Em combate
         //--------------------------------------------------------------------------------------------------------------------
 
-        else if (in_combat)
+        else if (game.game_situation == 2)
         {
-
-            if (IsKeyPressed(KEY_R))
-            {
-                in_combat = FALSE;
-                exploring_map = TRUE;
-            }
-
-            BeginDrawing();
-            ClearBackground(BLACK);
-            DrawText("COMBAT", 400, 300, 50, WHITE);
-            EndDrawing();
-        }
-
-        //--------------------------------------------------------------------------------------------------------------------
-        // Jogo pausado
-        //---------------------------------------------------------------------------------------------------------------------
-
-        else if (game_is_paused)
-        {
-            if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
-            {
-                game_is_paused = FALSE;
-                exploring_map = TRUE;
-            }
-            if (IsKeyPressed(KEY_Q))
-            {
-                exit_requested = TRUE;
-            }
-            BeginDrawing();
-            ClearBackground(BLACK);
-            DrawText("PAUSED", 400, 300, 50, WHITE);
-            EndDrawing();
+            combat(&game);
         }
     }
 
     UnloadTexture(player.texture);
     UnloadTexture(grass.floor);
     UnloadTexture(grass.bush);
-    UnloadTexture(wallTexture);
+    UnloadTexture(grass.wall);
 
     // #####################################################################################################################
     CloseWindow(); // Fecha o jogo
     return 0;
+}
+
+void confirmExit(GameInfo *game)
+{
+    if (IsKeyPressed(KEY_ESCAPE))
+    {
+        game->exit_requested = FALSE;
+    }
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_Q))
+    {
+        game->must_exit = TRUE;
+        game->exit_requested = FALSE;
+    }
+
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    DrawRectangle(0, 100, SCREEN_WIDTH, SCREEN_HEIGHT - 200, BLACK);
+    DrawText("Você deseja sair sem salvar?", 80, 180, 30, WHITE);
+    DrawText("Pressione enter para sair", 80, 300, 30, WHITE);
+    EndDrawing();
+}
+
+void mainMenu(GameInfo *game)
+{
+    if (IsKeyPressed(KEY_C))
+    {
+        // TODO: loadGame()
+        game->game_situation = 1;
+    }
+    if (IsKeyPressed(KEY_N))
+    {
+        // TODO: newGame()
+    }
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
+    {
+        game->exit_requested = TRUE;
+    }
+
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+    DrawText("INFMON  !", SCREEN_WIDTH / 2 - 140, 180, 50, WHITE);
+    DrawText("-1", SCREEN_WIDTH / 2 + 60, 165, 35, WHITE);
+    DrawText("Pressione C para carregar seu jogo", SCREEN_WIDTH / 2 - 500, 300, 50, WHITE);
+    DrawText("Pressione N para criar um novo jogo", SCREEN_WIDTH / 2 - 500, 400, 50, WHITE);
+    DrawText("Pressione Q para fechar o jogo", SCREEN_WIDTH / 2 - 450, 500, 50, WHITE);
+
+    EndDrawing();
+}
+
+void pauseGame(GameInfo *game)
+{
+    if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
+    {
+        game->game_is_paused = FALSE;
+    }
+    if (IsKeyPressed(KEY_Q))
+    {
+        game->exit_requested = TRUE;
+    }
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawText("PAUSED", 400, 300, 50, WHITE);
+    EndDrawing();
+}
+
+void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[ROWS][COLUMNS])
+{
+    if (IsKeyPressed(KEY_TAB))
+    {
+        game->game_is_paused = TRUE;
+    }
+    if (IsKeyPressed(KEY_ESCAPE))
+    {
+        game->exit_requested = TRUE;
+    }
+    if (movePlayer(&player->posX, &player->posY, map))
+    {
+        if (movingThroughGrass(player->posX, player->posY, map))
+        {
+            if (randomEncounter())
+            {
+                game->game_situation = 2;
+            }
+        }
+    }
+
+    movePlayer(&player->posX, &player->posY, map);
+    BeginDrawing();
+    drawMap(mapa, map);
+    ClearBackground(RAYWHITE);
+    DrawTexture(player->texture, player->posX, player->posY, WHITE);
+    DrawText("Press TAB to open pause menu", 20, 0, 20, WHITE);
+    EndDrawing();
+}
+
+void combat(GameInfo *game)
+{
+    if (IsKeyPressed(KEY_R))
+    {
+        game->game_situation = 1;
+    }
+
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawText("COMBAT", 400, 300, 50, WHITE);
+    EndDrawing();
 }
 
 //=====================================================================================================================
@@ -265,7 +315,7 @@ int randomEncounter()
 {
     int battle_start = FALSE;
 
-    if (GetRandomValue(1, 100) == 1)
+    if (GetRandomValue(1, 300) == 1)
         battle_start = TRUE;
 
     return battle_start;
@@ -282,7 +332,7 @@ int movingThroughGrass(int pX, int pY, char map[ROWS][COLUMNS])
     return in_grass;
 }
 
-void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste)
+void changeMap(char map[ROWS][COLUMNS], int numMap)
 {
     int i, j;
     FILE *arqMap;
@@ -291,7 +341,6 @@ void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste)
 
     if (arqMap == NULL)
     {
-        *teste = 1;
     }
     else
     {
@@ -308,7 +357,7 @@ void changeMap(char map[ROWS][COLUMNS], int numMap, int *teste)
     fclose(arqMap);
 }
 
-void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS])
+void drawMap(Maps *m, char map[ROWS][COLUMNS])
 {
     int i, j;
     for (i = 0; i < ROWS; i++)
@@ -318,7 +367,7 @@ void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS])
             switch (map[i][j])
             {
             case 'W':
-                DrawTexture(wall, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
+                DrawTexture(m->wall, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
                 break;
             case ' ':
             case 'J':
@@ -326,7 +375,7 @@ void drawMap(Maps *m, Texture2D wall, char map[ROWS][COLUMNS])
                 DrawRectangle(j * SQUARE_WIDTH, i * SQUARE_WIDTH, SQUARE_WIDTH, SQUARE_WIDTH, GREEN);
                 break;
             case 'G':
-                DrawTexture(m->floor, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE); // TODO: corrigir bug e mudar de 'floor' para 'bush'
+                DrawTexture(m->floor, j * SQUARE_WIDTH, i * SQUARE_WIDTH, WHITE);
                 break;
             }
         }
