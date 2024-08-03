@@ -6,8 +6,6 @@
 
 #define SCREEN_HEIGHT 960
 #define SCREEN_WIDTH 1920
-#define STARTING_POSITION_X 300
-#define STARTING_POSITION_Y 300
 #define MOVEMENT_SPEED 3
 #define SQUARE_WIDTH 32
 #define ENTITY_SIZE 32
@@ -90,6 +88,8 @@ void combat(GameInfo *game);
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
 
+int loadGame(SaveInfo *data, Entity *player, int *numMap);
+
 // função pra salvar o jogo em save.bin
 int saveGame(SaveInfo *data, Entity player, int numMap);
 
@@ -113,8 +113,6 @@ int main(void)
     Maps grass;
     Entity player;
     SaveInfo saveData;
-    player.posX = STARTING_POSITION_X;
-    player.posY = STARTING_POSITION_Y;
 
     // Variáveis de "estado de jogo"
     //---------------------------------------------------------------------------------------------------------------------
@@ -129,7 +127,7 @@ int main(void)
     // VARIÁVEIS
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    int mapNum = 3;
+    int mapNum = 1;
     char map[COLUMNS][ROWS]; // Gerador de mapa provisório
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,6 +147,7 @@ int main(void)
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
     changeMap(map, mapNum, &player);
+    loadGame(&saveData, &player, &mapNum);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -392,14 +391,11 @@ void drawMap(Maps *m, char map[COLUMNS][ROWS])
     }
 }
 
-int saveGame(SaveInfo *data, Entity player, int numMap)
+int loadGame(SaveInfo *data, Entity *player, int *numMap)
 {
     FILE *saveArq;
 
-    data->mapNum = numMap;
-    data->Player_info = player;
-
-    saveArq = fopen("save.bin", "w+");
+    saveArq = fopen("saves/save.bin", "r");
 
     if (saveArq == NULL)
     {
@@ -407,6 +403,33 @@ int saveGame(SaveInfo *data, Entity player, int numMap)
     }
     else
     {
+        fread(data, sizeof(*data), 1, saveArq);
+        fclose(saveArq);
+    }
+
+    *player = data->Player_info;
+    *numMap = data->mapNum;
+
+    return 0;
+}
+
+int saveGame(SaveInfo *data, Entity player, int numMap)
+{
+    FILE *saveArq;
+
+    // atualiza a estrutura com o save
+    data->mapNum = numMap;
+    data->Player_info = player;
+
+    saveArq = fopen("saves/save.bin", "w");
+
+    if (saveArq == NULL)
+    {
+        return 1;
+    }
+    else
+    {
+        // escreve e salva o arquivo com o save
         fwrite(data, sizeof(*data), 1, saveArq);
         fclose(saveArq);
     }
