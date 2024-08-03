@@ -52,6 +52,7 @@ typedef struct
     int exit_requested;
     int must_exit;      // Determina se o jogador quer fechar o jogo
     int game_situation; // 0: main menu, 1: exploração, 2: combate
+    int current_game_saved;
 
 } GameInfo;
 
@@ -68,16 +69,16 @@ typedef struct
 //*********************************************************************************************************************
 
 // recarrega o mapa diferente na matriz map
-void changeMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
+void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
 
 // confirma se o player realmente quer sair
 void confirmExit(GameInfo *game);
 
 // faz o menu principal
-void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap);
+void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose);
 
 // controla a pause
-void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap);
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose);
 
 // exploracao
 void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
@@ -104,7 +105,7 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
 int randomEncounter();
 
 // Função que atualiza a posição do personagem
-int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS]);
+int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS]);
 //*********************************************************************************************************************
 
 // MAIN
@@ -131,7 +132,7 @@ int main(void)
     // VARIÁVEIS
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    int mapNum = 1;
+    int menuChoose = 0, mapNum = 1;
     char map[COLUMNS][ROWS]; // Gerador de mapa provisório
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -150,7 +151,7 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    changeMap(map, mapNum, &player);
+    loadMap(map, mapNum, &player);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -170,7 +171,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_situation == 0)
         {
-            mainMenu(&game, &saveData, &player, &mapNum);
+            mainMenu(&game, &saveData, &player, &mapNum, &menuChoose);
         }
 
         //--------------------------------------------------------------------------------------------------------------------
@@ -178,7 +179,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_is_paused)
         {
-            pauseGame(&game, &saveData, &player, &mapNum);
+            pauseGame(&game, &saveData, &player, &mapNum, &menuChoose);
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -214,7 +215,7 @@ int main(void)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // recarrega o mapa diferente na matriz map
-void changeMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
+void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
 {
     int i, j;
     int transpose[ROWS][COLUMNS];
@@ -277,53 +278,142 @@ void confirmExit(GameInfo *game)
 }
 
 // faz o menu principal
-void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap)
+void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose)
 {
-    if (IsKeyPressed(KEY_C))
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*choose == 0)
+        {
+            *choose = 2;
+        }
+        else
+        {
+            *choose -= 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*choose == 2)
+        {
+            *choose = 0;
+        }
+        else
+        {
+            *choose += 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_C) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
         loadGame(data, player, numMap);
         game->game_situation = 1;
     }
-    if (IsKeyPressed(KEY_N))
+    if (IsKeyPressed(KEY_N) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
         newGame(data);
         game->game_situation = 1;
+        *choose = 0;
     }
-    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
     {
         game->exit_requested = TRUE;
+        *choose = 0;
     }
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+
+    // desenha o quadrado de escolha
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * *choose, 10, 160, WHITE);
+
+    // escreve os textos de opcoes
     DrawText("INFMON  !", SCREEN_WIDTH / 2 - 140, 180, 50, WHITE);
     DrawText("-1", SCREEN_WIDTH / 2 + 60, 165, 35, WHITE);
-    DrawText("Pressione C para carregar seu jogo", SCREEN_WIDTH / 2 - 500, 300, 50, WHITE);
-    DrawText("Pressione N para criar um novo jogo", SCREEN_WIDTH / 2 - 500, 400, 50, WHITE);
-    DrawText("Pressione Q para fechar o jogo", SCREEN_WIDTH / 2 - 450, 500, 50, WHITE);
+    DrawText("Carregar jogo (C)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
+    DrawText("Criar novo jogo (N)", SCREEN_WIDTH / 2 - 270, 500, 50, WHITE);
+    DrawText("Fechar o jogo (Q)", SCREEN_WIDTH / 2 - 250, 650, 50, WHITE);
 
     EndDrawing();
 }
 
 // controla o pause
-void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap)
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose)
 {
-    if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*choose == 0)
+        {
+            *choose = 4;
+        }
+        else
+        {
+            *choose -= 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*choose == 4)
+        {
+            *choose = 0;
+        }
+        else
+        {
+            *choose += 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
         game->game_is_paused = FALSE;
     }
-    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
     {
         game->exit_requested = TRUE;
     }
-    if (IsKeyPressed(KEY_S))
+    if (IsKeyPressed(KEY_S) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
     {
         saveGame(data, *player, *numMap);
+        game->current_game_saved = TRUE;
+    }
+    if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
+    {
+        game->game_situation = 0;
+        game->game_is_paused = FALSE;
     }
     BeginDrawing();
     ClearBackground(BLACK);
-    DrawText("PAUSED", 400, 300, 50, WHITE);
+    DrawText("JOGO PAUSADO", SCREEN_WIDTH / 2 - 230, 180, 50, WHITE);
+
+    if (game->current_game_saved)
+    {
+        DrawText("Jogo salvo!", SCREEN_WIDTH - 200, 800, 20, WHITE);
+    }
+
+    // desenha o quadrado de escolha
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % 3), 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * ((*choose) % 3), 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % 3), 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * ((*choose) % 3), 10, 160, WHITE);
+
+    // escreve os textos de opcoes
+    if (*choose <= 2)
+    {
+        DrawText("Continuar jogo (C)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
+        DrawText("Carregar jogo (L)", SCREEN_WIDTH / 2 - 245, 500, 50, WHITE);
+        DrawText("Salvar jogo (S)", SCREEN_WIDTH / 2 - 235, 650, 50, WHITE);
+    }
+    else
+    {
+        DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
+        DrawText("Sair sem salvar (S)", SCREEN_WIDTH / 2 - 260, 500, 50, WHITE);
+    }
+
     EndDrawing();
 }
 
@@ -338,7 +428,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
     {
         game->exit_requested = TRUE;
     }
-    if (movePlayer(&player->posX, &player->posY, map))
+    if (movePlayer(game, &player->posX, &player->posY, map))
     {
         if (movingThroughGrass(player->posX, player->posY, map))
         {
@@ -349,7 +439,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
         }
     }
 
-    movePlayer(&player->posX, &player->posY, map);
+    movePlayer(game, &player->posX, &player->posY, map);
     BeginDrawing();
     ClearBackground(RAYWHITE);
     drawMap(mapa, map);
@@ -496,28 +586,32 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
     return in_grass;
 }
 
-int movePlayer(int *pX, int *pY, char map[COLUMNS][ROWS])
+int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS])
 {
     int moving = FALSE;
-    if (IsKeyDown(KEY_RIGHT) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+    if ((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) && map[(*pX + ENTITY_SIZE) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
     {
         *pX += MOVEMENT_SPEED;
         moving = TRUE;
     }
-    if (IsKeyDown(KEY_LEFT) && map[(*pX - MOVEMENT_SPEED) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
+    if ((IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) && map[(*pX - MOVEMENT_SPEED) / SQUARE_WIDTH][*pY / SQUARE_WIDTH] != 'W')
     {
         *pX -= MOVEMENT_SPEED;
         moving = TRUE;
     }
-    if (IsKeyDown(KEY_UP) && map[*pX / SQUARE_WIDTH][(*pY - MOVEMENT_SPEED) / SQUARE_WIDTH] != 'W')
+    if ((IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) && map[*pX / SQUARE_WIDTH][(*pY - MOVEMENT_SPEED) / SQUARE_WIDTH] != 'W')
     {
         *pY -= MOVEMENT_SPEED;
         moving = TRUE;
     }
-    if (IsKeyDown(KEY_DOWN) && map[*pX / SQUARE_WIDTH][(*pY + ENTITY_SIZE) / SQUARE_WIDTH] != 'W')
+    if ((IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) && map[*pX / SQUARE_WIDTH][(*pY + ENTITY_SIZE) / SQUARE_WIDTH] != 'W')
     {
         *pY += MOVEMENT_SPEED;
         moving = TRUE;
+    }
+    if (moving)
+    {
+        game->current_game_saved = FALSE;
     }
 
     return moving;
