@@ -70,7 +70,7 @@ typedef struct
 //*********************************************************************************************************************
 
 // recarrega o mapa diferente na matriz map
-void changeMap(char map[COLUMNS][ROWS], int numMap);
+void changeMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
 
 // confirma se o player realmente quer sair
 void confirmExit(GameInfo *game);
@@ -89,6 +89,9 @@ void combat(GameInfo *game);
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
+
+// função pra salvar o jogo em save.bin
+int saveGame(SaveInfo *data, Entity player, int numMap);
 
 // Função que determina se jogador está passando por zona de encontro aleatório
 int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
@@ -109,6 +112,7 @@ int main(void)
     GameInfo game;
     Maps grass;
     Entity player;
+    SaveInfo saveData;
     player.posX = STARTING_POSITION_X;
     player.posY = STARTING_POSITION_Y;
 
@@ -144,7 +148,7 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    changeMap(map, mapNum);
+    changeMap(map, mapNum, &player);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -192,6 +196,7 @@ int main(void)
             combat(&game);
         }
     }
+    saveGame(&saveData, player, mapNum);
 
     UnloadTexture(player.texture);
     UnloadTexture(grass.floor);
@@ -208,7 +213,7 @@ int main(void)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // recarrega o mapa diferente na matriz map
-void changeMap(char map[COLUMNS][ROWS], int numMap)
+void changeMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
 {
     int i, j;
     int transpose[ROWS][COLUMNS];
@@ -236,6 +241,12 @@ void changeMap(char map[COLUMNS][ROWS], int numMap)
                     j--;
 
                 map[j][i] = transpose[i][j];
+
+                if (map[j][i] == 'J')
+                {
+                    player->posX = j * ENTITY_SIZE;
+                    player->posY = i * ENTITY_SIZE;
+                }
             }
         }
     }
@@ -334,8 +345,8 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 
     movePlayer(&player->posX, &player->posY, map);
     BeginDrawing();
-    drawMap(mapa, map);
     ClearBackground(RAYWHITE);
+    drawMap(mapa, map);
     DrawTexture(player->texture, player->posX, player->posY, WHITE);
     DrawText("Press TAB to open pause menu", 20, 0, 20, WHITE);
     EndDrawing();
@@ -379,6 +390,27 @@ void drawMap(Maps *m, char map[COLUMNS][ROWS])
             }
         }
     }
+}
+
+int saveGame(SaveInfo *data, Entity player, int numMap)
+{
+    FILE *saveArq;
+
+    data->mapNum = numMap;
+    data->Player_info = player;
+
+    saveArq = fopen("save.bin", "w+");
+
+    if (saveArq == NULL)
+    {
+        return 1;
+    }
+    else
+    {
+        fwrite(data, sizeof(*data), 1, saveArq);
+        fclose(saveArq);
+    }
+    return 0;
 }
 
 int randomEncounter()
