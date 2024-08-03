@@ -74,10 +74,10 @@ void changeMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
 void confirmExit(GameInfo *game);
 
 // faz o menu principal
-void mainMenu(GameInfo *game);
+void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap);
 
 // controla a pause
-void pauseGame(GameInfo *game);
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap);
 
 // exploracao
 void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
@@ -88,10 +88,14 @@ void combat(GameInfo *game);
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
 
+// função pra carregar o jogo em save.bin
 int loadGame(SaveInfo *data, Entity *player, int *numMap);
 
 // função pra salvar o jogo em save.bin
 int saveGame(SaveInfo *data, Entity player, int numMap);
+
+// função pra criar novo jogo em save.bin
+int newGame(SaveInfo *data);
 
 // Função que determina se jogador está passando por zona de encontro aleatório
 int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
@@ -147,7 +151,6 @@ int main(void)
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
     changeMap(map, mapNum, &player);
-    loadGame(&saveData, &player, &mapNum);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -167,7 +170,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_situation == 0)
         {
-            mainMenu(&game);
+            mainMenu(&game, &saveData, &player, &mapNum);
         }
 
         //--------------------------------------------------------------------------------------------------------------------
@@ -175,7 +178,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_is_paused)
         {
-            pauseGame(&game);
+            pauseGame(&game, &saveData, &player, &mapNum);
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -195,7 +198,6 @@ int main(void)
             combat(&game);
         }
     }
-    saveGame(&saveData, player, mapNum);
 
     UnloadTexture(player.texture);
     UnloadTexture(grass.floor);
@@ -275,16 +277,17 @@ void confirmExit(GameInfo *game)
 }
 
 // faz o menu principal
-void mainMenu(GameInfo *game)
+void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap)
 {
     if (IsKeyPressed(KEY_C))
     {
-        // TODO: loadGame()
+        loadGame(data, player, numMap);
         game->game_situation = 1;
     }
     if (IsKeyPressed(KEY_N))
     {
-        // TODO: newGame()
+        newGame(data);
+        game->game_situation = 1;
     }
     if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
     {
@@ -304,7 +307,7 @@ void mainMenu(GameInfo *game)
 }
 
 // controla o pause
-void pauseGame(GameInfo *game)
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap)
 {
     if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_C))
     {
@@ -313,6 +316,10 @@ void pauseGame(GameInfo *game)
     if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE))
     {
         game->exit_requested = TRUE;
+    }
+    if (IsKeyPressed(KEY_S))
+    {
+        saveGame(data, *player, *numMap);
     }
     BeginDrawing();
     ClearBackground(BLACK);
@@ -420,6 +427,38 @@ int saveGame(SaveInfo *data, Entity player, int numMap)
     // atualiza a estrutura com o save
     data->mapNum = numMap;
     data->Player_info = player;
+
+    saveArq = fopen("saves/save.bin", "w");
+
+    if (saveArq == NULL)
+    {
+        return 1;
+    }
+    else
+    {
+        // escreve e salva o arquivo com o save
+        fwrite(data, sizeof(*data), 1, saveArq);
+        fclose(saveArq);
+    }
+    return 0;
+}
+
+int newGame(SaveInfo *data)
+{
+    int i;
+    FILE *saveArq;
+
+    // zera todas as informaçoes para criar novo save
+    data->mapNum = 1;
+    for (i = 0; i < 3; i++)
+    {
+        data->Player_info.mon[0].current_health_value = 0;
+        data->Player_info.mon[0].current_xp = 0;
+        data->Player_info.mon[0].infmon_type = 0;
+        data->Player_info.mon[0].level = 0;
+        data->Player_info.mon[0].level_up_xp_threshold = 0;
+        data->Player_info.mon[0].max_health = 0;
+    }
 
     saveArq = fopen("saves/save.bin", "w");
 
