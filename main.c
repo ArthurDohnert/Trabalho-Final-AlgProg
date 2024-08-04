@@ -53,6 +53,7 @@ typedef struct
     int must_exit;      // Determina se o jogador quer fechar o jogo
     int game_situation; // 0: main menu, 1: exploração, 2: combate
     int current_game_saved;
+    int randomInfmon;
 
 } GameInfo;
 
@@ -84,7 +85,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
 void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
 
 // combate
-void combat(GameInfo *game);
+void combat(GameInfo *game, Infmon *enemy);
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
@@ -103,6 +104,8 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
 
 // Função que gera encontro aleatório
 int randomEncounter();
+
+Infmon generateRandomInfmon();
 
 // Função que atualiza a posição do personagem
 int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS]);
@@ -125,6 +128,7 @@ int main(void)
     game.game_is_paused = FALSE;
     game.exit_requested = FALSE;
     game.must_exit = FALSE;
+    game.randomInfmon = FALSE;
     game.game_situation = 0; // inicia na tela de menu
 
     //---------------------------------------------------------------------------------------------------------------------
@@ -211,7 +215,13 @@ int main(void)
 
         else if (game.game_situation == 2)
         {
-            combat(&game);
+            if (game.randomInfmon)
+            {
+                combat(&game, generateRandomInfmon());
+            }
+            else
+            {
+            }
         }
     }
 
@@ -528,7 +538,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 }
 
 // combate
-void combat(GameInfo *game)
+void combat(GameInfo *game, Infmon *enemy)
 {
     if (IsKeyPressed(KEY_R))
     {
@@ -668,6 +678,16 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
         in_grass = TRUE;
 
     return in_grass;
+}
+
+// funcao que cria um infmon aleatorio para a luta aleatoria
+Infmon generateRandomInfmon()
+{
+    Infmon randomEnemy;
+
+    randomEnemy.current_xp = 0;
+
+    return randomEnemy;
 }
 
 // Função que atualiza a posição do personagem
