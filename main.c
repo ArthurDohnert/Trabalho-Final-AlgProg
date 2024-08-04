@@ -26,6 +26,8 @@ typedef struct
     int level;
     int current_xp;
     int level_up_xp_threshold;
+    int attack;
+    int defense;
 } Infmon;
 
 // Estrutura que define as propriedades de uma entidade
@@ -85,7 +87,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
 void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
 
 // combate
-void combat(GameInfo *game, Infmon *enemy);
+void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *chooseH);
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
@@ -121,6 +123,7 @@ int main(void)
     Maps grass;
     Entity player;
     SaveInfo saveData;
+    Infmon enemy;
 
     // Variáveis de "estado de jogo"
     //---------------------------------------------------------------------------------------------------------------------
@@ -136,7 +139,8 @@ int main(void)
     // VARIÁVEIS
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    int menuChoose = 0, mapNum = 1;
+    int menuChooseVertical = 0, menuChooseHorizontal = 0;
+    int mapNum = 5;
     char map[COLUMNS][ROWS]; // Gerador de mapa provisório
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,7 +171,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         if (game.exit_requested)
         {
-            if (confirmExit(&game, &menuChoose))
+            if (confirmExit(&game, &menuChooseVertical))
             {
                 saveGame(&saveData, player, mapNum);
             }
@@ -178,7 +182,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_is_paused)
         {
-            pauseGame(&game, &saveData, &player, &mapNum, &menuChoose, map);
+            pauseGame(&game, &saveData, &player, &mapNum, &menuChooseVertical, map);
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -186,7 +190,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_situation == 0)
         {
-            switch (mainMenu(&game, &menuChoose))
+            switch (mainMenu(&game, &menuChooseVertical))
             {
             case 1:
                 loadGame(&saveData, &player, &mapNum);
@@ -215,13 +219,15 @@ int main(void)
 
         else if (game.game_situation == 2)
         {
-            if (game.randomInfmon)
+            if (game.randomInfmon == TRUE)
             {
-                combat(&game, generateRandomInfmon());
+                enemy = generateRandomInfmon();
+                game.randomInfmon = 2; // gera o infmon aleatorio e não executa mais
             }
-            else
+            else if (game.randomInfmon == FALSE)
             {
             }
+            combat(&game, &player, &enemy, &menuChooseVertical, &menuChooseHorizontal);
         }
     }
 
@@ -521,7 +527,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
     {
         if (movingThroughGrass(player->posX, player->posY, map))
         {
-            if (randomEncounter())
+            if (randomEncounter(game))
             {
                 game->game_situation = 2;
             }
@@ -538,16 +544,85 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 }
 
 // combate
-void combat(GameInfo *game, Infmon *enemy)
+void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *chooseH)
 {
+    // sobe a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*chooseV == 0)
+            *chooseV = 1;
+        else
+            *chooseV -= 1;
+    }
+
+    // desce a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*chooseV == 1)
+            *chooseV = 0;
+        else
+            *chooseV += 1;
+    }
+
+    // move para a direita a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_RIGHT))
+    {
+        if (*chooseH == 0)
+            *chooseH = 1;
+        else
+            *chooseH -= 1;
+    }
+
+    // move para a esquerda a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_LEFT))
+    {
+        if (*chooseH == 1)
+            *chooseH = 0;
+        else
+            *chooseH += 1;
+    }
+
     if (IsKeyPressed(KEY_R))
     {
         game->game_situation = 1;
+        game->randomInfmon = FALSE;
     }
 
     BeginDrawing();
-    ClearBackground(BLACK);
-    DrawText("COMBAT", 400, 300, 50, WHITE);
+    ClearBackground(RAYWHITE);
+    DrawRectangle(0, 0, 400, 250, BLACK);
+    DrawText("COMBAT", 100, 100, 50, WHITE);
+
+    // menu de opcoes
+    DrawRectangle(1180, 620, SCREEN_WIDTH - 900, 10, BLACK);
+    DrawRectangle(1180, 620, 10, SCREEN_HEIGHT - 500, BLACK);
+
+    DrawRectangle(1230 + 330 * *chooseH, 670 + 130 * *chooseV, 330, 10, BLACK);
+    DrawRectangle(1230 + 330 * *chooseH, 670 + 130 * *chooseV, 10, 130, BLACK);
+    DrawRectangle(1230 + 330 * *chooseH, 790 + 130 * *chooseV, 330, 10, BLACK);
+    DrawRectangle(1550 + 330 * *chooseH, 670 + 130 * *chooseV, 10, 130, BLACK);
+
+    DrawText("ATAQUE", 1290, 710, 50, BLACK);
+    DrawText("CAPTURA", 1600, 710, 50, BLACK);
+    DrawText("TROCA", 1300, 840, 50, BLACK);
+    DrawText("FUGA", 1650, 840, 50, BLACK);
+
+    // desenha o oponente
+    DrawTexture(player->texture, 400, 700, WHITE);
+    switch (enemy->infmon_type)
+    {
+    case 'f':
+        DrawRectangle(1500, 300, 64, 64, RED);
+        break;
+
+    case 'w':
+        DrawRectangle(1500, 300, 64, 64, BLUE);
+        break;
+
+    case 'g':
+        DrawRectangle(1500, 300, 64, 64, GREEN);
+        break;
+    }
     EndDrawing();
 }
 
@@ -634,12 +709,7 @@ int newGame(SaveInfo *data)
     data->mapNum = 1;
     for (i = 0; i < 3; i++)
     {
-        data->Player_info.mon[0].current_health_value = 0;
-        data->Player_info.mon[0].current_xp = 0;
-        data->Player_info.mon[0].infmon_type = 0;
-        data->Player_info.mon[0].level = 0;
-        data->Player_info.mon[0].level_up_xp_threshold = 0;
-        data->Player_info.mon[0].max_health = 0;
+        data->Player_info.mon[0].level = -1;
     }
 
     saveArq = fopen("saves/save.bin", "w");
@@ -658,12 +728,15 @@ int newGame(SaveInfo *data)
 }
 
 // Função que determina se jogador está passando por zona de encontro aleatório
-int randomEncounter()
+int randomEncounter(GameInfo *game)
 {
     int battle_start = FALSE;
 
-    if (GetRandomValue(1, 300) == 1)
+    if (GetRandomValue(1, 20) == 1)
+    {
         battle_start = TRUE;
+        game->randomInfmon = TRUE;
+    }
 
     return battle_start;
 }
@@ -684,8 +757,31 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
 Infmon generateRandomInfmon()
 {
     Infmon randomEnemy;
+    int randomValueToType;
 
     randomEnemy.current_xp = 0;
+    randomEnemy.level = GetRandomValue(1, 10);
+    randomEnemy.max_health = randomEnemy.current_health_value = 275 + 25 * (randomEnemy.level - 1);
+    randomEnemy.level_up_xp_threshold = 10 + 5 * (randomEnemy.level * 5);
+    randomEnemy.attack = 4 + randomEnemy.level;
+    randomEnemy.defense = 2 + randomEnemy.level;
+
+    randomValueToType = GetRandomValue(1, 3);
+
+    switch (randomValueToType)
+    {
+    case 1:
+        randomEnemy.infmon_type = 'f';
+        break;
+
+    case 2:
+        randomEnemy.infmon_type = 'w';
+        break;
+
+    case 3:
+        randomEnemy.infmon_type = 'g';
+        break;
+    }
 
     return randomEnemy;
 }
