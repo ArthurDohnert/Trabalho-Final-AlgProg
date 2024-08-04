@@ -69,16 +69,16 @@ typedef struct
 //*********************************************************************************************************************
 
 // recarrega o mapa diferente na matriz map
-void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
+void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos);
 
 // confirma se o player realmente quer sair
 int confirmExit(GameInfo *game, int *choose);
 
 // faz o menu principal
-void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose);
+int mainMenu(GameInfo *game, int *choose);
 
 // controla a pause
-void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose);
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose, char map[COLUMNS][ROWS]);
 
 // exploracao
 void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROWS]);
@@ -151,7 +151,7 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    loadMap(map, mapNum, &player);
+    loadMap(map, mapNum, &player, 1);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -169,20 +169,32 @@ int main(void)
             }
         }
 
-        //---------------------------------------------------------------------------------------------------------------------
-        // Main menu
-        //---------------------------------------------------------------------------------------------------------------------
-        else if (game.game_situation == 0)
-        {
-            mainMenu(&game, &saveData, &player, &mapNum, &menuChoose);
-        }
-
         //--------------------------------------------------------------------------------------------------------------------
         // Jogo pausado
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_is_paused)
         {
-            pauseGame(&game, &saveData, &player, &mapNum, &menuChoose);
+            pauseGame(&game, &saveData, &player, &mapNum, &menuChoose, map);
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------
+        // Main menu
+        //---------------------------------------------------------------------------------------------------------------------
+        else if (game.game_situation == 0)
+        {
+            switch (mainMenu(&game, &menuChoose))
+            {
+            case 1:
+                loadGame(&saveData, &player, &mapNum);
+                break;
+
+            case 2:
+                if (!newGame(&saveData))
+                {
+                    loadMap(map, mapNum, &player, 1);
+                }
+                break;
+            }
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -218,7 +230,7 @@ int main(void)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // recarrega o mapa diferente na matriz map
-void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
+void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos)
 {
     int i, j;
     int transpose[ROWS][COLUMNS];
@@ -247,7 +259,7 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
 
                 map[j][i] = transpose[i][j];
 
-                if (map[j][i] == 'J')
+                if (alteraPlayerPos && map[j][i] == 'J')
                 {
                     player->posX = j * ENTITY_SIZE;
                     player->posY = i * ENTITY_SIZE;
@@ -262,6 +274,7 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
 // confirma se o player realmente quer sair
 int confirmExit(GameInfo *game, int *choose)
 {
+    // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_UP))
     {
         if (*choose == 0)
@@ -274,6 +287,7 @@ int confirmExit(GameInfo *game, int *choose)
         }
     }
 
+    // desce a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
         if (*choose == 2)
@@ -327,8 +341,9 @@ int confirmExit(GameInfo *game, int *choose)
 }
 
 // faz o menu principal
-void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose)
+int mainMenu(GameInfo *game, int *choose)
 {
+    // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_UP))
     {
         if (*choose == 0)
@@ -341,6 +356,7 @@ void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *
         }
     }
 
+    // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
         if (*choose == 2)
@@ -355,14 +371,14 @@ void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *
 
     if (IsKeyPressed(KEY_C) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
-        loadGame(data, player, numMap);
         game->game_situation = 1;
+        return 1;
     }
     if (IsKeyPressed(KEY_N) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
-        newGame(data);
         game->game_situation = 1;
         *choose = 0;
+        return 2;
     }
     if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
     {
@@ -382,17 +398,20 @@ void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *
 
     // escreve os textos de opcoes
     DrawText("INFMON  !", SCREEN_WIDTH / 2 - 115, 180, 50, WHITE);
-    DrawText("-1", SCREEN_WIDTH / 2 + 97, 165, 35, WHITE);
+    DrawText("-1", SCREEN_WIDTH / 2 + 95, 165, 35, WHITE);
     DrawText("Carregar jogo (C)", SCREEN_WIDTH / 2 - 215, 350, 50, WHITE);
     DrawText("Criar novo jogo (N)", SCREEN_WIDTH / 2 - 235, 500, 50, WHITE);
     DrawText("Fechar o jogo (Q)", SCREEN_WIDTH / 2 - 215, 650, 50, WHITE);
 
     EndDrawing();
+
+    return 0;
 }
 
 // controla o pause
-void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose)
+void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose, char map[COLUMNS][ROWS])
 {
+    // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_UP))
     {
         if (*choose == 0)
@@ -405,6 +424,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
         }
     }
 
+    // desce a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
         if (*choose == 4)
@@ -421,11 +441,17 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     {
         game->game_is_paused = FALSE;
     }
+    if (IsKeyPressed(KEY_L) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
+    {
+        loadGame(data, player, numMap);
+        loadMap(map, *numMap, player, 0);
+        *choose = 0;
+        game->game_is_paused = FALSE;
+    }
     if (IsKeyPressed(KEY_S) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
     {
         saveGame(data, *player, *numMap);
         game->current_game_saved = TRUE;
-        *choose = 0;
     }
     if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
     {
@@ -464,7 +490,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     else
     {
         DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 220, 350, 50, WHITE);
-        DrawText("Sair sem salvar (S)", SCREEN_WIDTH / 2 - 230, 500, 50, WHITE);
+        DrawText("Sair (S)", SCREEN_WIDTH / 2 - 80, 500, 50, WHITE);
     }
 
     EndDrawing();
@@ -541,6 +567,7 @@ void drawMap(Maps *m, char map[COLUMNS][ROWS])
     }
 }
 
+// função pra carregar o jogo em save.bin
 int loadGame(SaveInfo *data, Entity *player, int *numMap)
 {
     FILE *saveArq;
@@ -563,6 +590,7 @@ int loadGame(SaveInfo *data, Entity *player, int *numMap)
     return 0;
 }
 
+// função pra salvar o jogo em save.bin
 int saveGame(SaveInfo *data, Entity player, int numMap)
 {
     FILE *saveArq;
@@ -586,6 +614,7 @@ int saveGame(SaveInfo *data, Entity player, int numMap)
     return 0;
 }
 
+// função pra criar novo jogo em save.bin
 int newGame(SaveInfo *data)
 {
     int i;
@@ -618,6 +647,7 @@ int newGame(SaveInfo *data)
     return 0;
 }
 
+// Função que determina se jogador está passando por zona de encontro aleatório
 int randomEncounter()
 {
     int battle_start = FALSE;
@@ -628,6 +658,7 @@ int randomEncounter()
     return battle_start;
 }
 
+// Função que gera encontro aleatório
 int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
 {
 
@@ -639,6 +670,7 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
     return in_grass;
 }
 
+// Função que atualiza a posição do personagem
 int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS])
 {
     int moving = FALSE;
