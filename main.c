@@ -72,7 +72,7 @@ typedef struct
 void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player);
 
 // confirma se o player realmente quer sair
-void confirmExit(GameInfo *game);
+int confirmExit(GameInfo *game, int *choose);
 
 // faz o menu principal
 void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *choose);
@@ -163,7 +163,10 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         if (game.exit_requested)
         {
-            confirmExit(&game);
+            if (confirmExit(&game, &menuChoose))
+            {
+                saveGame(&saveData, player, mapNum);
+            }
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -257,13 +260,43 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player)
 }
 
 // confirma se o player realmente quer sair
-void confirmExit(GameInfo *game)
+int confirmExit(GameInfo *game, int *choose)
 {
-    if (IsKeyPressed(KEY_ESCAPE))
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*choose == 0)
+        {
+            *choose = 2;
+        }
+        else
+        {
+            *choose -= 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*choose == 2)
+        {
+            *choose = 0;
+        }
+        else
+        {
+            *choose += 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
         game->exit_requested = FALSE;
     }
-    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_Q))
+    if (IsKeyPressed(KEY_Q) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
+    {
+        game->must_exit = TRUE;
+        game->exit_requested = FALSE;
+        return 1;
+    }
+    if (IsKeyPressed(KEY_ENTER) && *choose == 2)
     {
         game->must_exit = TRUE;
         game->exit_requested = FALSE;
@@ -271,10 +304,26 @@ void confirmExit(GameInfo *game)
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    DrawRectangle(0, 100, SCREEN_WIDTH, SCREEN_HEIGHT - 200, BLACK);
-    DrawText("Você deseja sair sem salvar?", 80, 180, 30, WHITE);
-    DrawText("Pressione enter para sair", 80, 300, 30, WHITE);
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+
+    if (game->current_game_saved)
+    {
+        DrawText("Jogo salvo!", SCREEN_WIDTH - 200, 800, 20, WHITE);
+    }
+
+    // desenha o quadrado de escolha
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * *choose, 10, 160, WHITE);
+
+    DrawText("VOCÊ REALMENTE DESEJA SAIR?", SCREEN_WIDTH / 2 - 435, 180, 50, WHITE);
+    DrawText("Voltar ao jogo", SCREEN_WIDTH / 2 - 200, 350, 50, WHITE);
+    DrawText("Salvar e sair", SCREEN_WIDTH / 2 - 185, 500, 50, WHITE);
+    DrawText("Sair sem salvar", SCREEN_WIDTH / 2 - 205, 650, 50, WHITE);
     EndDrawing();
+
+    return 0;
 }
 
 // faz o menu principal
@@ -326,17 +375,17 @@ void mainMenu(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int *
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
 
     // desenha o quadrado de escolha
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 910, 10, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * *choose, 910, 10, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * *choose, 10, 160, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 450 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 460, 300 + 150 * *choose, 10, 160, WHITE);
 
     // escreve os textos de opcoes
-    DrawText("INFMON  !", SCREEN_WIDTH / 2 - 140, 180, 50, WHITE);
-    DrawText("-1", SCREEN_WIDTH / 2 + 60, 165, 35, WHITE);
-    DrawText("Carregar jogo (C)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
-    DrawText("Criar novo jogo (N)", SCREEN_WIDTH / 2 - 270, 500, 50, WHITE);
-    DrawText("Fechar o jogo (Q)", SCREEN_WIDTH / 2 - 250, 650, 50, WHITE);
+    DrawText("INFMON  !", SCREEN_WIDTH / 2 - 115, 180, 50, WHITE);
+    DrawText("-1", SCREEN_WIDTH / 2 + 97, 165, 35, WHITE);
+    DrawText("Carregar jogo (C)", SCREEN_WIDTH / 2 - 215, 350, 50, WHITE);
+    DrawText("Criar novo jogo (N)", SCREEN_WIDTH / 2 - 235, 500, 50, WHITE);
+    DrawText("Fechar o jogo (Q)", SCREEN_WIDTH / 2 - 215, 650, 50, WHITE);
 
     EndDrawing();
 }
@@ -372,23 +421,27 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     {
         game->game_is_paused = FALSE;
     }
-    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
-    {
-        game->exit_requested = TRUE;
-    }
     if (IsKeyPressed(KEY_S) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
     {
         saveGame(data, *player, *numMap);
         game->current_game_saved = TRUE;
+        *choose = 0;
     }
     if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
     {
         game->game_situation = 0;
         game->game_is_paused = FALSE;
+        *choose = 0;
     }
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
+    {
+        game->exit_requested = TRUE;
+        *choose = 0;
+    }
+
     BeginDrawing();
     ClearBackground(BLACK);
-    DrawText("JOGO PAUSADO", SCREEN_WIDTH / 2 - 230, 180, 50, WHITE);
+    DrawText("JOGO PAUSADO", SCREEN_WIDTH / 2 - 190, 180, 50, WHITE);
 
     if (game->current_game_saved)
     {
@@ -404,14 +457,14 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     // escreve os textos de opcoes
     if (*choose <= 2)
     {
-        DrawText("Continuar jogo (C)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
-        DrawText("Carregar jogo (L)", SCREEN_WIDTH / 2 - 245, 500, 50, WHITE);
-        DrawText("Salvar jogo (S)", SCREEN_WIDTH / 2 - 235, 650, 50, WHITE);
+        DrawText("Continuar jogo (C)", SCREEN_WIDTH / 2 - 215, 350, 50, WHITE);
+        DrawText("Carregar jogo (L)", SCREEN_WIDTH / 2 - 210, 500, 50, WHITE);
+        DrawText("Salvar jogo (S)", SCREEN_WIDTH / 2 - 180, 650, 50, WHITE);
     }
     else
     {
-        DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 250, 350, 50, WHITE);
-        DrawText("Sair sem salvar (S)", SCREEN_WIDTH / 2 - 260, 500, 50, WHITE);
+        DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 220, 350, 50, WHITE);
+        DrawText("Sair sem salvar (S)", SCREEN_WIDTH / 2 - 230, 500, 50, WHITE);
     }
 
     EndDrawing();
