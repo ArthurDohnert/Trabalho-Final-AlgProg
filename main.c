@@ -200,6 +200,7 @@ int main(void)
                 if (!newGame(&saveData))
                 {
                     loadMap(map, mapNum, &player, 1);
+                    saveGame(&saveData, player, mapNum);
                 }
                 break;
             }
@@ -250,7 +251,7 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlay
 {
     int i, j;
     int transpose[ROWS][COLUMNS];
-    char numStr[5];
+    char numStr[3];
     char fileName[20] = "maps/Mapa";
     FILE *arqMap;
 
@@ -546,6 +547,21 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 // combate
 void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *chooseH)
 {
+    char enemyLvl[9] = "Nível ";
+    char enemyHealth[10] = {};
+    char numStr[5];
+
+    // gera a string enemy lvl, para ser exibida no combate
+    sprintf(numStr, "%d", enemy->level);
+    strcat(enemyLvl, numStr);
+
+    // gera a string enemy health
+    sprintf(numStr, "%d", enemy->current_health_value);
+    strcat(enemyHealth, numStr);
+    strcat(enemyHealth, "/");
+    sprintf(numStr, "%d", enemy->max_health);
+    strcat(enemyHealth, numStr);
+
     // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_UP))
     {
@@ -582,7 +598,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
             *chooseH += 1;
     }
 
-    if (IsKeyPressed(KEY_R))
+    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)))
     {
         game->game_situation = 1;
         game->randomInfmon = FALSE;
@@ -597,18 +613,22 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
     DrawRectangle(1180, 620, SCREEN_WIDTH - 900, 10, BLACK);
     DrawRectangle(1180, 620, 10, SCREEN_HEIGHT - 500, BLACK);
 
+    // desenha o quadrado ao redor da opcao escolhida no menu
     DrawRectangle(1230 + 330 * *chooseH, 670 + 130 * *chooseV, 330, 10, BLACK);
     DrawRectangle(1230 + 330 * *chooseH, 670 + 130 * *chooseV, 10, 130, BLACK);
     DrawRectangle(1230 + 330 * *chooseH, 790 + 130 * *chooseV, 330, 10, BLACK);
     DrawRectangle(1550 + 330 * *chooseH, 670 + 130 * *chooseV, 10, 130, BLACK);
 
+    // opcoes do menu de combate
     DrawText("ATAQUE", 1290, 710, 50, BLACK);
     DrawText("CAPTURA", 1600, 710, 50, BLACK);
     DrawText("TROCA", 1300, 840, 50, BLACK);
     DrawText("FUGA", 1650, 840, 50, BLACK);
 
-    // desenha o oponente
+    // desenha o player
     DrawTexture(player->texture, 400, 700, WHITE);
+
+    // desenha o oponente
     switch (enemy->infmon_type)
     {
     case 'f':
@@ -623,6 +643,18 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
         DrawRectangle(1500, 300, 64, 64, GREEN);
         break;
     }
+
+    // centraliza o nivel em cima no combate
+    if (enemy->level >= 10)
+        DrawText(enemyLvl, 1495, 280, 20, BLACK);
+    else
+        DrawText(enemyLvl, 1500, 280, 20, BLACK);
+
+    DrawText(enemyHealth, 1490, 380, 20, BLACK);
+    DrawRectangle(1430, 404, 204, 30, DARKGRAY);
+    DrawRectangle(1435, 409, 194, 20, RED);
+    DrawRectangle(1435, 409, 194 * (enemy->current_health_value / enemy->max_health), 20, GREEN);
+
     EndDrawing();
 }
 
