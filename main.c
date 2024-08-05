@@ -12,6 +12,7 @@
 #define ROWS 30
 #define COLUMNS 60
 #define MAX_INFMONS 3
+#define INFMON_BIGGEST_NAME 30
 #define TRUE 1
 #define FALSE 0
 
@@ -22,12 +23,13 @@ typedef struct
 {
     int current_health_value;
     int max_health;
-    char infmon_type;
     int level;
     int current_xp;
     int level_up_xp_threshold;
     int attack;
     int defense;
+    char infmon_type;
+    char name[30];
 } Infmon;
 
 // Estrutura que define as propriedades de uma entidade
@@ -56,7 +58,8 @@ typedef struct
     int game_situation; // 0: main menu, 1: exploração, 2: combate
     int current_game_saved;
     int randomInfmon;
-
+    int choosenInfmon;
+    int infmonMenu;
 } GameInfo;
 
 // acumula todas as informações que serao passadas pro arquivo de save
@@ -91,6 +94,8 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
+
+void openInfmonMenu(GameInfo *game, Entity *player, int *choose);
 
 // função pra carregar o jogo em save.bin
 int loadGame(SaveInfo *data, Entity *player, int *numMap);
@@ -132,6 +137,8 @@ int main(void)
     game.exit_requested = FALSE;
     game.must_exit = FALSE;
     game.randomInfmon = FALSE;
+    game.infmonMenu = FALSE;
+    game.choosenInfmon = 0;  // inicia o jogo com primeiro infmon sendo escolhido para os combates
     game.game_situation = 0; // inicia na tela de menu
 
     //---------------------------------------------------------------------------------------------------------------------
@@ -177,12 +184,20 @@ int main(void)
             }
         }
 
-        //--------------------------------------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------------------------------------------------------
         // Jogo pausado
         //---------------------------------------------------------------------------------------------------------------------
         else if (game.game_is_paused)
         {
             pauseGame(&game, &saveData, &player, &mapNum, &menuChooseVertical, map);
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------
+        // Menu de seleção de infmons
+        //---------------------------------------------------------------------------------------------------------------------
+        else if (game.infmonMenu)
+        {
+            openInfmonMenu(&game, &player, &menuChooseVertical);
         }
 
         //---------------------------------------------------------------------------------------------------------------------
@@ -199,6 +214,7 @@ int main(void)
             case 2:
                 if (!newGame(&saveData))
                 {
+                    loadGame(&saveData, &player, &mapNum);
                     loadMap(map, mapNum, &player, 1);
                     saveGame(&saveData, player, mapNum);
                 }
@@ -262,6 +278,11 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlay
 
     arqMap = fopen(fileName, "r");
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///
+    /// TODO :::: CORRIGIR ESTE IF
+    ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if (arqMap == NULL)
     {
     }
@@ -433,7 +454,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     {
         if (*choose == 0)
         {
-            *choose = 4;
+            *choose = 5;
         }
         else
         {
@@ -444,7 +465,7 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     // desce a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
-        if (*choose == 4)
+        if (*choose == 5)
         {
             *choose = 0;
         }
@@ -458,11 +479,9 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     {
         game->game_is_paused = FALSE;
     }
-    if (IsKeyPressed(KEY_L) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
+    if (IsKeyPressed(KEY_I) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
-        loadGame(data, player, numMap);
-        loadMap(map, *numMap, player, 0);
-        *choose = 0;
+        game->infmonMenu = TRUE;
         game->game_is_paused = FALSE;
     }
     if (IsKeyPressed(KEY_S) || (IsKeyPressed(KEY_ENTER) && *choose == 2))
@@ -470,13 +489,20 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
         saveGame(data, *player, *numMap);
         game->current_game_saved = TRUE;
     }
-    if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
+    if (IsKeyPressed(KEY_L) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
+    {
+        loadGame(data, player, numMap);
+        loadMap(map, *numMap, player, 0);
+        *choose = 0;
+        game->game_is_paused = FALSE;
+    }
+    if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
     {
         game->game_situation = 0;
         game->game_is_paused = FALSE;
         *choose = 0;
     }
-    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 5))
     {
         game->exit_requested = TRUE;
         *choose = 0;
@@ -501,13 +527,14 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     if (*choose <= 2)
     {
         DrawText("Continuar jogo (C)", SCREEN_WIDTH / 2 - 215, 350, 50, WHITE);
-        DrawText("Carregar jogo (L)", SCREEN_WIDTH / 2 - 210, 500, 50, WHITE);
+        DrawText("Selecionar Infmons (I)", SCREEN_WIDTH / 2 - 260, 500, 50, WHITE);
         DrawText("Salvar jogo (S)", SCREEN_WIDTH / 2 - 180, 650, 50, WHITE);
     }
     else
     {
-        DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 220, 350, 50, WHITE);
-        DrawText("Sair (S)", SCREEN_WIDTH / 2 - 80, 500, 50, WHITE);
+        DrawText("Carregar jogo (L)", SCREEN_WIDTH / 2 - 210, 350, 50, WHITE);
+        DrawText("Voltar ao menu (B)", SCREEN_WIDTH / 2 - 220, 500, 50, WHITE);
+        DrawText("Sair (S)", SCREEN_WIDTH / 2 - 80, 650, 50, WHITE);
     }
 
     EndDrawing();
@@ -548,12 +575,18 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *chooseH)
 {
     char enemyLvl[9] = "Nível ";
+    char playerMonLvl[9] = "Nível ";
     char enemyHealth[10] = {};
+    char playerMonHealth[10] = {};
     char numStr[5];
 
     // gera a string enemy lvl, para ser exibida no combate
     sprintf(numStr, "%d", enemy->level);
     strcat(enemyLvl, numStr);
+
+    // gera a string player mon lvl, para ser exibida no combate
+    sprintf(numStr, "%d", player->mon[game->choosenInfmon].level);
+    strcat(playerMonLvl, numStr);
 
     // gera a string enemy health
     sprintf(numStr, "%d", enemy->current_health_value);
@@ -561,6 +594,13 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
     strcat(enemyHealth, "/");
     sprintf(numStr, "%d", enemy->max_health);
     strcat(enemyHealth, numStr);
+
+    // gera a string enemy health
+    sprintf(numStr, "%d", player->mon[game->choosenInfmon].current_health_value);
+    strcat(playerMonHealth, numStr);
+    strcat(playerMonHealth, "/");
+    sprintf(numStr, "%d", player->mon[game->choosenInfmon].current_health_value);
+    strcat(playerMonHealth, numStr);
 
     // sobe a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_UP))
@@ -598,10 +638,22 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
             *chooseH += 1;
     }
 
+    // abre o submenu de seleção de infmons
     if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)))
     {
         game->game_situation = 1;
         game->randomInfmon = FALSE;
+        *chooseH = 0;
+        *chooseV = 0;
+    }
+
+    // foge do combate
+    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)))
+    {
+        game->game_situation = 1;
+        game->randomInfmon = FALSE;
+        *chooseH = 0;
+        *chooseV = 0;
     }
 
     BeginDrawing();
@@ -625,10 +677,35 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
     DrawText("TROCA", 1300, 840, 50, BLACK);
     DrawText("FUGA", 1650, 840, 50, BLACK);
 
-    // desenha o player
-    DrawTexture(player->texture, 400, 700, WHITE);
+    // desenha o player ----------------------------------------
+    switch (player->mon[game->choosenInfmon].infmon_type)
+    {
+    case 'f':
+        DrawRectangle(400, 700, 64, 64, RED);
+        break;
 
-    // desenha o oponente
+    case 'w':
+        DrawRectangle(400, 700, 64, 64, BLUE);
+        break;
+
+    case 'g':
+        DrawRectangle(400, 700, 64, 64, GREEN);
+        break;
+    }
+
+    // exibe o nivel centralizado em cima do infmon combate
+    if (player->mon[game->choosenInfmon].level >= 10)
+        DrawText(playerMonLvl, 395, 680, 20, BLACK);
+    else
+        DrawText(playerMonLvl, 400, 680, 20, BLACK);
+
+    // desenha a barra de vida e a quantidade de vida
+    DrawText(playerMonHealth, 390, 780, 20, BLACK);
+    DrawRectangle(330, 804, 204, 30, DARKGRAY);
+    DrawRectangle(335, 809, 194, 20, RED);
+    DrawRectangle(335, 809, 194 * ((float)(player->mon[game->choosenInfmon].current_health_value / player->mon[game->choosenInfmon].max_health)), 20, GREEN);
+
+    // desenha o oponente ----------------------------------------
     switch (enemy->infmon_type)
     {
     case 'f':
@@ -644,16 +721,17 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
         break;
     }
 
-    // centraliza o nivel em cima no combate
+    // exibe o nivel centralizado em cima do infmon combate
     if (enemy->level >= 10)
         DrawText(enemyLvl, 1495, 280, 20, BLACK);
     else
         DrawText(enemyLvl, 1500, 280, 20, BLACK);
 
+    // desenha a barra de vida e a quantidade de vida
     DrawText(enemyHealth, 1490, 380, 20, BLACK);
     DrawRectangle(1430, 404, 204, 30, DARKGRAY);
     DrawRectangle(1435, 409, 194, 20, RED);
-    DrawRectangle(1435, 409, 194 * (enemy->current_health_value / enemy->max_health), 20, GREEN);
+    DrawRectangle(1435, 409, 194 * ((float)(enemy->current_health_value / enemy->max_health)), 20, GREEN);
 
     EndDrawing();
 }
@@ -684,6 +762,64 @@ void drawMap(Maps *m, char map[COLUMNS][ROWS])
     }
 }
 
+void openInfmonMenu(GameInfo *game, Entity *player, int *choose)
+{
+    int i = 0;
+
+    // sobe a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*choose == 0)
+            *choose = 3;
+        else
+            *choose -= 1;
+    }
+
+    // desce a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*choose == 3)
+            *choose = 0;
+        else
+            *choose += 1;
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
+    {
+        game->infmonMenu = FALSE;
+        game->game_is_paused = TRUE;
+    }
+
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+
+    // desenha o quadrado de escolha
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 450 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 460, 300 + 150 * *choose, 10, 160, WHITE);
+
+    // escreve os textos de opcoes
+    DrawText("Selecione seu Infmon", SCREEN_WIDTH / 2 - 250, 180, 50, WHITE);
+
+    for (i = 0; i < 3; i++)
+    {
+        if (player->mon[i].level != -1)
+        {
+            DrawText(player->mon[i].name, SCREEN_WIDTH / 2 - 200, 350 + i * 150, 50, WHITE);
+        }
+        else
+        {
+            DrawText("Infbola vazia!", SCREEN_WIDTH / 2 - 200, 350 + i * 150, 50, WHITE);
+        }
+    }
+
+    DrawText("Voltar", SCREEN_WIDTH / 2 - 150, 800, 50, WHITE);
+
+    EndDrawing();
+}
+
 // função pra carregar o jogo em save.bin
 int loadGame(SaveInfo *data, Entity *player, int *numMap)
 {
@@ -701,7 +837,12 @@ int loadGame(SaveInfo *data, Entity *player, int *numMap)
         fclose(saveArq);
     }
 
-    *player = data->Player_info;
+    player->posX = data->Player_info.posX;
+    player->posY = data->Player_info.posY;
+    player->mon[0] = data->Player_info.mon[0];
+    player->mon[1] = data->Player_info.mon[1];
+    player->mon[2] = data->Player_info.mon[2];
+
     *numMap = data->mapNum;
 
     return 0;
@@ -734,15 +875,30 @@ int saveGame(SaveInfo *data, Entity player, int numMap)
 // função pra criar novo jogo em save.bin
 int newGame(SaveInfo *data)
 {
-    int i;
     FILE *saveArq;
 
-    // zera todas as informaçoes para criar novo save
-    data->mapNum = 1;
-    for (i = 0; i < 3; i++)
-    {
-        data->Player_info.mon[0].level = -1;
-    }
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///
+    /// TODO :::: ARRUMAR QUE POKEMONS O PLAYER DEVE TER AO COMEÇAR UM SAVE NOVO
+    ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // cria as informacoes iniciais do player e do mapa ao criar um save novo
+    data->mapNum = 5;
+    data->Player_info.mon[1].level = -1;
+    data->Player_info.mon[2].level = -1;
+
+    // -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@-
+
+    // define o infmon inicial do player
+    data->Player_info.mon[0].current_xp = 0;
+    data->Player_info.mon[0].level = 1;
+    data->Player_info.mon[0].max_health = data->Player_info.mon[0].current_health_value = 275;
+    data->Player_info.mon[0].level_up_xp_threshold = 10;
+    data->Player_info.mon[0].attack = 5;
+    data->Player_info.mon[0].defense = 3;
+    data->Player_info.mon[0].infmon_type = 'f';
+    strcpy(data->Player_info.mon[0].name, "fogomon");
 
     saveArq = fopen("saves/save.bin", "w");
 
