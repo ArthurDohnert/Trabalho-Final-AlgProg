@@ -54,12 +54,13 @@ typedef struct
 {
     int game_is_paused; // Determina se o jogo está pausado
     int exit_requested;
-    int must_exit;      // Determina se o jogador quer fechar o jogo
-    int game_situation; // 0: main menu, 1: exploração, 2: combate
-    int current_game_saved;
-    int randomInfmon;
-    int choosenInfmon;
-    int infmonMenu;
+    int must_exit;          // Determina se o jogador quer fechar o jogo
+    int game_situation;     // 0: main menu, 1: exploração, 2: combate
+    int current_game_saved; // guarda se o jogo atual esta salvo
+    int randomInfmon;       // determina se o infmon com o qual havera o combate é aleatorio
+    int choosenInfmon;      // determina qual sera o infmon a iniciar no combate
+    int infmonMenu;         // determina se o menu de infmons esta aberto
+    int menuCombat;         // 0: menu inicial, 1: ataques, 2: trocar infmon
 } GameInfo;
 
 // acumula todas as informações que serao passadas pro arquivo de save
@@ -95,6 +96,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
 
+// faz o menu de infmons
 void openInfmonMenu(GameInfo *game, Entity *player, int *choose);
 
 // função pra carregar o jogo em save.bin
@@ -112,7 +114,12 @@ int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS]);
 // Função que gera encontro aleatório
 int randomEncounter();
 
+// gera um infmon aleatorio
 Infmon generateRandomInfmon();
+
+int tryToCatchInfmon(Infmon enemy);
+
+int addInfmon(Entity *player, Infmon enemy);
 
 // Função que atualiza a posição do personagem
 int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS]);
@@ -140,6 +147,7 @@ int main(void)
     game.infmonMenu = FALSE;
     game.choosenInfmon = 0;  // inicia o jogo com primeiro infmon sendo escolhido para os combates
     game.game_situation = 0; // inicia na tela de menu
+    game.menuCombat = 0;
 
     //---------------------------------------------------------------------------------------------------------------------
 
@@ -638,22 +646,80 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
             *chooseH += 1;
     }
 
-    // abre o submenu de seleção de infmons
-    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)))
+    // tenta capturar o infmon ininmigo
+    if (IsKeyPressed(KEY_C) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 0)) && game->menuCombat == 0))
     {
-        game->game_situation = 1;
+        if (game->randomInfmon == 2)
+        {
+            if (tryToCatchInfmon(*enemy))
+            {
+                if (addInfmon(player, *enemy))
+                {
+                    game->randomInfmon = FALSE;
+                    game->game_situation = 1;
+                    game->menuCombat = 0;
+                    *chooseH = 0;
+                    *chooseV = 0;
+                }
+                else
+                {
+                    DrawText("Infbag cheia...", 100, 880, 30, BLACK);
+                }
+            }
+            else
+            {
+                DrawText("Não foi possível capturar o Infmon", 100, 880, 30, BLACK);
+            }
+        }
+        else
+        {
+            DrawText("Não é possível capturar Infmon não selvagem", 100, 880, 30, BLACK);
+        }
+    }
+
+    // troca de infmon
+    if (IsKeyPressed(KEY_ENTER) && game->menuCombat == 2)
+    {
+        if (*chooseH == 0 && *chooseV == 0 && player->mon[0].level != -1)
+        {
+            game->choosenInfmon = 0;
+        }
+        else if (*chooseH == 1 && *chooseV == 0 && player->mon[1].level != -1)
+        {
+            game->choosenInfmon = 1;
+        }
+        else if (*chooseH == 0 && *chooseV == 1 && player->mon[2].level != -1)
+        {
+            game->choosenInfmon = 2;
+        }
+    }
+
+    // abre o submenu de ataque
+    if (IsKeyPressed(KEY_A) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 0)) && game->menuCombat == 0))
+    {
+        game->menuCombat = 1;
+    }
+
+    // abre o submenu de seleção de infmons
+    if (IsKeyPressed(KEY_T) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 1)) && game->menuCombat == 0))
+    {
+        game->menuCombat = 2;
+    }
+
+    // foge do combate, precisa ficar antes do if da opção de voltar pro menu padrão de combate
+    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1) && game->menuCombat == 0))
+    {
         game->randomInfmon = FALSE;
+        game->game_situation = 1;
+        game->menuCombat = 0;
         *chooseH = 0;
         *chooseV = 0;
     }
 
-    // foge do combate
-    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)))
+    // volta para o menu padrao de combate
+    if ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)) && (game->menuCombat == 1 || game->menuCombat == 2))
     {
-        game->game_situation = 1;
-        game->randomInfmon = FALSE;
-        *chooseH = 0;
-        *chooseV = 0;
+        game->menuCombat = 0;
     }
 
     BeginDrawing();
@@ -672,10 +738,29 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, int *chooseV, int *ch
     DrawRectangle(1550 + 330 * *chooseH, 670 + 130 * *chooseV, 10, 130, BLACK);
 
     // opcoes do menu de combate
-    DrawText("ATAQUE", 1290, 710, 50, BLACK);
-    DrawText("CAPTURA", 1600, 710, 50, BLACK);
-    DrawText("TROCA", 1300, 840, 50, BLACK);
-    DrawText("FUGA", 1650, 840, 50, BLACK);
+    switch (game->menuCombat)
+    {
+    case 0:
+        DrawText("ATAQUE", 1290, 710, 50, BLACK);
+        DrawText("CAPTURA", 1600, 710, 50, BLACK);
+        DrawText("TROCA", 1300, 840, 50, BLACK);
+        DrawText("FUGA", 1650, 840, 50, BLACK);
+        break;
+
+    case 1:
+        DrawText("PATADA", 1290, 710, 50, BLACK);
+        DrawText("FOGAREU", 1600, 710, 50, BLACK);
+        DrawText("EXEMPLO", 1290, 840, 50, BLACK);
+        DrawText("VOLTAR", 1600, 840, 50, BLACK);
+        break;
+
+    case 2:
+        DrawText(player->mon[0].name, 1290, 710, 50, BLACK);
+        DrawText(player->mon[1].name, 1600, 710, 50, BLACK);
+        DrawText(player->mon[2].name, 1290, 840, 50, BLACK);
+        DrawText("VOLTAR", 1600, 840, 50, BLACK);
+        break;
+    }
 
     // desenha o player ----------------------------------------
     switch (player->mon[game->choosenInfmon].infmon_type)
@@ -887,6 +972,8 @@ int newGame(SaveInfo *data)
     data->mapNum = 5;
     data->Player_info.mon[1].level = -1;
     data->Player_info.mon[2].level = -1;
+    strcpy(data->Player_info.mon[1].name, "");
+    strcpy(data->Player_info.mon[2].name, "");
 
     // -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@- TESTE -@-@-@-@-@-@-@-@-@-@-@-@-
 
@@ -960,18 +1047,49 @@ Infmon generateRandomInfmon()
     {
     case 1:
         randomEnemy.infmon_type = 'f';
+        strcpy(randomEnemy.name, "fogomon");
         break;
 
     case 2:
         randomEnemy.infmon_type = 'w';
+        strcpy(randomEnemy.name, "aguamon");
         break;
 
     case 3:
         randomEnemy.infmon_type = 'g';
+        strcpy(randomEnemy.name, "gramamon");
         break;
     }
 
     return randomEnemy;
+}
+
+// tenta capturar o infmon com base na vida dele
+int tryToCatchInfmon(Infmon enemy)
+{
+    int chance = enemy.current_health_value / 40; // determina a chance do infmon ser capturado
+
+    if (GetRandomValue(1, chance) == 2)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int addInfmon(Entity *player, Infmon enemy)
+{
+    int i;
+
+    for (i = 0; i < 3; i++)
+    {
+        if (player->mon[i].level == -1)
+        {
+            player->mon[i] = enemy;
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 // Função que atualiza a posição do personagem
