@@ -127,7 +127,11 @@ void enemyAttack(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *com
 // tela de que morreu e perdeu o jogo
 void loseGame(GameInfo *game, int *choose);
 
+// cura todos os infmons do player
 void healInfmon(Entity *player);
+
+// verifica se um infmon subiu de nível, se sim, melhora seus atributos e mostra na tela que ele subiu de nivel
+int levelUpInfmon(Entity *player, int selectedInfmon);
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
@@ -696,6 +700,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
 
     if (enemy->current_health_value <= 0)
     {
+        // retorna as variaveis de game ao normal
         combatInfo->infmonTurn = 0;
         game->randomInfmon = FALSE;
         game->game_situation = 1;
@@ -703,10 +708,16 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         *chooseH = 0;
         *chooseV = 0;
         combatInfo->fightText[0] = '\0';
-        healInfmon(player);
-        player->mon[0].current_xp += 10 * enemy->level;
-        player->mon[1].current_xp += 10 * enemy->level;
-        player->mon[2].current_xp += 10 * enemy->level;
+
+        healInfmon(player); // heala os infmons
+
+        // upa os infmons
+        player->mon[0].current_xp += 5 * enemy->level;
+        player->mon[1].current_xp += 5 * enemy->level;
+        player->mon[2].current_xp += 5 * enemy->level;
+        levelUpInfmon(player, 0);
+        levelUpInfmon(player, 1);
+        levelUpInfmon(player, 2);
     }
 
     if (player->mon[game->choosenInfmon].current_health_value <= 0)
@@ -936,29 +947,19 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
 void enemyAttack(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatInfo)
 {
     int randomValueToAttack = GetRandomValue(1, 3);
-    // char texto[25];
-
-    // strcat(texto, enemy->name);
-    // strcat(texto, " usou ");
 
     switch (randomValueToAttack)
     {
     case 1:
         player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier1 * enemy->attack) - player->mon[game->choosenInfmon].defense;
-        // strcat(texto, enemy->habilities.attack1);
-        // strcpy(combatInfo->fightText, texto);
         break;
 
     case 2:
         player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier2 * enemy->attack) - player->mon[game->choosenInfmon].defense;
-        // strcat(texto, enemy->habilities.attack2);
-        // strcpy(combatInfo->fightText, texto);
         break;
 
     case 3:
         player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier3 * enemy->attack) - player->mon[game->choosenInfmon].defense;
-        // strcat(texto, enemy->habilities.attack3);
-        // strcpy(combatInfo->fightText, texto);
         break;
     }
 
@@ -1026,6 +1027,39 @@ void healInfmon(Entity *player)
     player->mon[0].current_health_value = player->mon[0].max_health;
     player->mon[1].current_health_value = player->mon[1].max_health;
     player->mon[2].current_health_value = player->mon[2].max_health;
+}
+
+// verifica se um infmon subiu de nível, se sim, mostra na tela que ele subiu de nivel
+int levelUpInfmon(Entity *player, int selectedInfmon)
+{
+    // texto de levelup
+    char levelUpText[20] = "";
+
+    strcat(levelUpText, "Seu ");
+    strcat(levelUpText, player->mon[selectedInfmon].name);
+    strcat(levelUpText, " subiu de nível!");
+
+    if (player->mon[selectedInfmon].current_xp >= player->mon[selectedInfmon].level_up_xp_threshold)
+    {
+        // melhora os atributos
+        player->mon[selectedInfmon].level++;
+        player->mon[selectedInfmon].attack += 2;
+        player->mon[selectedInfmon].defense++;
+        player->mon[selectedInfmon].current_xp -= player->mon[selectedInfmon].level_up_xp_threshold;
+        player->mon[selectedInfmon].max_health += 25;
+        player->mon[selectedInfmon].level_up_xp_threshold += 20;
+
+        // tela de que upou
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+        DrawText(levelUpText, SCREEN_WIDTH / 2 - 400, 400, 50, WHITE);
+        EndDrawing();
+        for (int i = 0; i < 2000000000; i++)
+            ;
+        return 1;
+    }
+    return 0;
 }
 
 // função que desenha o mapa
@@ -1254,9 +1288,9 @@ Infmon generateRandomInfmon()
     randomEnemy.current_xp = 0;
     randomEnemy.level = GetRandomValue(1, 10);
     randomEnemy.max_health = randomEnemy.current_health_value = 275 + 25 * (randomEnemy.level - 1);
-    randomEnemy.level_up_xp_threshold = 10 + 5 * (randomEnemy.level * 5);
-    randomEnemy.attack = 25 + 2 * randomEnemy.level;
-    randomEnemy.defense = 3 + randomEnemy.level;
+    randomEnemy.level_up_xp_threshold = 10 + 20 * randomEnemy.level;
+    randomEnemy.attack = 25 + 2 * (randomEnemy.level - 1);
+    randomEnemy.defense = 3 + (randomEnemy.level - 1);
 
     randomValueToType = GetRandomValue(1, 3);
 
