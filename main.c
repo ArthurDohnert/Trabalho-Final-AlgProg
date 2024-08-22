@@ -19,7 +19,7 @@
 // ESTRUTURAS
 //*********************************************************************************************************************
 
-//
+// ataques dos infmons
 typedef struct
 {
     char attack1[20];
@@ -71,7 +71,7 @@ typedef struct
     int game_is_paused; // Determina se o jogo está pausado
     int exit_requested;
     int must_exit;          // Determina se o jogador quer fechar o jogo
-    int game_situation;     // 0: main menu, 1: exploração, 2: combate
+    int game_situation;     // 0: main menu, 1: exploração, 2: combate, 3: perdeu o jogo
     int current_game_saved; // guarda se o jogo atual esta salvo
     int randomInfmon;       // determina se o infmon com o qual havera o combate é aleatorio
     int choosenInfmon;      // determina qual sera o infmon a iniciar no combate
@@ -88,6 +88,7 @@ typedef struct
     char playerMonHealth[10];
     char numStr[5];
     char fightText[50];
+    int infmonTurn; // 0 para o player, 1 para o inimigo
 } CombatStats;
 
 // acumula todas as informações que serao passadas pro arquivo de save
@@ -119,6 +120,14 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
 
 // combate
 void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatInfo, int *chooseV, int *chooseH);
+
+// ataque do inimigo no combate
+void enemyAttack(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatInfo);
+
+// tela de que morreu e perdeu o jogo
+void loseGame(GameInfo *game, int *choose);
+
+void healInfmon(Entity *player);
 
 // Função que desenha o mapa
 void drawMap(Maps *m, char map[COLUMNS][ROWS]);
@@ -178,6 +187,7 @@ int main(void)
     game.menuCombat = 0;
 
     combatInfo.fightText[0] = '\0';
+    combatInfo.infmonTurn = 0;
     //---------------------------------------------------------------------------------------------------------------------
 
     // VARIÁVEIS
@@ -282,6 +292,11 @@ int main(void)
             {
             }
             combat(&game, &player, &enemy, &combatInfo, &menuChooseVertical, &menuChooseHorizontal);
+        }
+
+        else if (game.game_situation == 3)
+        {
+            loseGame(&game, &menuChooseVertical);
         }
     }
 
@@ -431,7 +446,7 @@ int mainMenu(GameInfo *game, int *choose)
         }
     }
 
-    // sobe a seleção do botão do menu com as setas
+    // desce a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
         if (*choose == 2)
@@ -631,11 +646,11 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     sprintf(combatInfo->numStr, "%d", enemy->max_health);
     strcat(combatInfo->enemyHealth, combatInfo->numStr);
 
-    // gera a string enemy health
+    // gera a string player health
     sprintf(combatInfo->numStr, "%d", player->mon[game->choosenInfmon].current_health_value);
     strcat(combatInfo->playerMonHealth, combatInfo->numStr);
     strcat(combatInfo->playerMonHealth, "/");
-    sprintf(combatInfo->numStr, "%d", player->mon[game->choosenInfmon].current_health_value);
+    sprintf(combatInfo->numStr, "%d", player->mon[game->choosenInfmon].max_health);
     strcat(combatInfo->playerMonHealth, combatInfo->numStr);
 
     // sobe a seleção do botão do menu com as setas
@@ -674,21 +689,60 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
             *chooseH += 1;
     }
 
+    if (combatInfo->infmonTurn == 1)
+    {
+        enemyAttack(game, player, enemy, combatInfo);
+    }
+
+    if (enemy->current_health_value <= 0)
+    {
+        combatInfo->infmonTurn = 0;
+        game->randomInfmon = FALSE;
+        game->game_situation = 1;
+        game->menuCombat = 0;
+        *chooseH = 0;
+        *chooseV = 0;
+        combatInfo->fightText[0] = '\0';
+        healInfmon(player);
+        player->mon[0].current_xp += 10 * enemy->level;
+        player->mon[1].current_xp += 10 * enemy->level;
+        player->mon[2].current_xp += 10 * enemy->level;
+    }
+
+    if (player->mon[game->choosenInfmon].current_health_value <= 0)
+    {
+        if (player->mon[(game->choosenInfmon + 1) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 1) % 3].level != -1)
+        {
+            game->choosenInfmon = (game->choosenInfmon + 1) % 3;
+        }
+        else if (player->mon[(game->choosenInfmon + 2) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 2) % 3].level != -1)
+        {
+            game->choosenInfmon = (game->choosenInfmon + 2) % 3;
+        }
+        else
+        {
+            game->game_situation = 3;
+        }
+    }
+
     // tenta capturar o infmon ininmigo
     if (IsKeyPressed(KEY_C) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 0)) && game->menuCombat == 0))
     {
+        combatInfo->infmonTurn = 1;
         if (game->randomInfmon == 2)
         {
             if (tryToCatchInfmon(*enemy))
             {
                 if (addInfmon(player, *enemy))
                 {
+                    combatInfo->infmonTurn = 0;
                     game->randomInfmon = FALSE;
                     game->game_situation = 1;
                     game->menuCombat = 0;
                     *chooseH = 0;
                     *chooseV = 0;
                     combatInfo->fightText[0] = '\0';
+                    healInfmon(player);
                 }
                 else
                 {
@@ -711,14 +765,17 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     {
         if (*chooseH == 0 && *chooseV == 0)
         {
+            combatInfo->infmonTurn = 1;
             enemy->current_health_value -= (int)(player->mon[game->choosenInfmon].habilities.multiplier1 * player->mon[game->choosenInfmon].attack) - enemy->defense;
         }
         else if (*chooseH == 1 && *chooseV == 0)
         {
+            combatInfo->infmonTurn = 1;
             enemy->current_health_value -= (int)(player->mon[game->choosenInfmon].habilities.multiplier2 * player->mon[game->choosenInfmon].attack) - enemy->defense;
         }
         else if (*chooseH == 0 && *chooseV == 1)
         {
+            combatInfo->infmonTurn = 1;
             enemy->current_health_value -= (int)(player->mon[game->choosenInfmon].habilities.multiplier3 * player->mon[game->choosenInfmon].attack) - enemy->defense;
         }
     }
@@ -729,14 +786,17 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         if (*chooseH == 0 && *chooseV == 0 && player->mon[0].level != -1)
         {
             game->choosenInfmon = 0;
+            combatInfo->infmonTurn = 1;
         }
         else if (*chooseH == 1 && *chooseV == 0 && player->mon[1].level != -1)
         {
             game->choosenInfmon = 1;
+            combatInfo->infmonTurn = 1;
         }
         else if (*chooseH == 0 && *chooseV == 1 && player->mon[2].level != -1)
         {
             game->choosenInfmon = 2;
+            combatInfo->infmonTurn = 1;
         }
     }
 
@@ -761,6 +821,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         *chooseH = 0;
         *chooseV = 0;
         strcpy(combatInfo->fightText, "");
+        healInfmon(player);
     }
 
     // volta para o menu padrao de combate
@@ -798,9 +859,9 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         break;
 
     case 1:
-        DrawText(player->mon[0].habilities.attack1, 1290, 720, 28, BLACK);
-        DrawText(player->mon[0].habilities.attack2, 1600, 720, 28, BLACK);
-        DrawText(player->mon[0].habilities.attack3, 1290, 850, 28, BLACK);
+        DrawText(player->mon[game->choosenInfmon].habilities.attack1, 1290, 720, 28, BLACK);
+        DrawText(player->mon[game->choosenInfmon].habilities.attack2, 1600, 720, 28, BLACK);
+        DrawText(player->mon[game->choosenInfmon].habilities.attack3, 1290, 850, 28, BLACK);
         DrawText("VOLTAR", 1600, 840, 50, BLACK);
         break;
 
@@ -869,6 +930,102 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     DrawRectangle(1435, 409, 194 * ((float)enemy->current_health_value / (float)enemy->max_health), 20, GREEN);
 
     EndDrawing();
+}
+
+// ataque do inimigo no combate
+void enemyAttack(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatInfo)
+{
+    int randomValueToAttack = GetRandomValue(1, 3);
+    // char texto[25];
+
+    // strcat(texto, enemy->name);
+    // strcat(texto, " usou ");
+
+    switch (randomValueToAttack)
+    {
+    case 1:
+        player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier1 * enemy->attack) - player->mon[game->choosenInfmon].defense;
+        // strcat(texto, enemy->habilities.attack1);
+        // strcpy(combatInfo->fightText, texto);
+        break;
+
+    case 2:
+        player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier2 * enemy->attack) - player->mon[game->choosenInfmon].defense;
+        // strcat(texto, enemy->habilities.attack2);
+        // strcpy(combatInfo->fightText, texto);
+        break;
+
+    case 3:
+        player->mon[game->choosenInfmon].current_health_value -= (int)(enemy->habilities.multiplier3 * enemy->attack) - player->mon[game->choosenInfmon].defense;
+        // strcat(texto, enemy->habilities.attack3);
+        // strcpy(combatInfo->fightText, texto);
+        break;
+    }
+
+    combatInfo->infmonTurn = 0;
+}
+
+void loseGame(GameInfo *game, int *choose)
+{
+    // sobe a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_UP))
+    {
+        if (*choose == 0)
+        {
+            *choose = 1;
+        }
+        else
+        {
+            *choose -= 1;
+        }
+    }
+
+    // desce a seleção do botão do menu com as setas
+    if (IsKeyPressed(KEY_DOWN))
+    {
+        if (*choose == 1)
+        {
+            *choose = 0;
+        }
+        else
+        {
+            *choose += 1;
+        }
+    }
+
+    if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
+    {
+        game->game_situation = 0;
+    }
+    if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
+    {
+        game->exit_requested = TRUE;
+        *choose = 0;
+    }
+
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+
+    // desenha o quadrado de escolha
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 450 + 150 * *choose, 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 440, 300 + 150 * *choose, 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 460, 300 + 150 * *choose, 10, 160, WHITE);
+
+    // escreve os textos de opcoes
+    DrawText("Você perdeu", SCREEN_WIDTH / 2 - 150, 180, 50, WHITE);
+    DrawText("Voltar ao menu principal (B)", SCREEN_WIDTH / 2 - 350, 350, 50, WHITE);
+    DrawText("Sair do jogo (Q)", SCREEN_WIDTH / 2 - 190, 500, 50, WHITE);
+
+    EndDrawing();
+}
+
+void healInfmon(Entity *player)
+{
+    player->mon[0].current_health_value = player->mon[0].max_health;
+    player->mon[1].current_health_value = player->mon[1].max_health;
+    player->mon[2].current_health_value = player->mon[2].max_health;
 }
 
 // função que desenha o mapa
@@ -1108,16 +1265,43 @@ Infmon generateRandomInfmon()
     case 1:
         randomEnemy.infmon_type = 'f';
         strcpy(randomEnemy.name, "fogomon");
+        strcpy(randomEnemy.habilities.attack1, "BAFO DE FOGO");
+        randomEnemy.habilities.type1 = 'f';
+        randomEnemy.habilities.multiplier1 = 1;
+        strcpy(randomEnemy.habilities.attack2, "TAPA NA CARA");
+        randomEnemy.habilities.type2 = 'n';
+        randomEnemy.habilities.multiplier2 = 1.1;
+        strcpy(randomEnemy.habilities.attack3, "LANÇA-CHAMAS");
+        randomEnemy.habilities.type3 = 'f';
+        randomEnemy.habilities.multiplier3 = 1.25;
         break;
 
     case 2:
         randomEnemy.infmon_type = 'w';
         strcpy(randomEnemy.name, "aguamon");
+        strcpy(randomEnemy.habilities.attack1, "JATO D'ÁGUA");
+        randomEnemy.habilities.type1 = 'w';
+        randomEnemy.habilities.multiplier1 = 1;
+        strcpy(randomEnemy.habilities.attack2, "SOCO DIRETO");
+        randomEnemy.habilities.type2 = 'n';
+        randomEnemy.habilities.multiplier2 = 1.1;
+        strcpy(randomEnemy.habilities.attack3, "CACHOEIRA");
+        randomEnemy.habilities.type3 = 'w';
+        randomEnemy.habilities.multiplier3 = 1.25;
         break;
 
     case 3:
         randomEnemy.infmon_type = 'g';
         strcpy(randomEnemy.name, "gramamon");
+        strcpy(randomEnemy.habilities.attack1, "FOTOSSÍNTESE");
+        randomEnemy.habilities.type1 = 'w';
+        randomEnemy.habilities.multiplier1 = 1;
+        strcpy(randomEnemy.habilities.attack2, "SOCO DIRETO");
+        randomEnemy.habilities.type2 = 'n';
+        randomEnemy.habilities.multiplier2 = 1.1;
+        strcpy(randomEnemy.habilities.attack3, "ARMADILHA DO ISAAC");
+        randomEnemy.habilities.type3 = 'w';
+        randomEnemy.habilities.multiplier3 = 1.25;
         break;
     }
 
@@ -1148,7 +1332,6 @@ int addInfmon(Entity *player, Infmon enemy)
             return 1;
         }
     }
-
     return 0;
 }
 
