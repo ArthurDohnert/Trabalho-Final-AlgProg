@@ -4,6 +4,7 @@
 #include <time.h>
 #include <string.h>
 
+// constantes gerais de jogo
 #define SCREEN_HEIGHT 960
 #define SCREEN_WIDTH 1920
 #define MOVEMENT_SPEED 3
@@ -13,10 +14,53 @@
 #define COLUMNS 60
 #define MAX_INFMONS 3
 #define INFMON_BIGGEST_NAME 30
+#define AVG_TEXT_SIZE 50
+#define SMALL_TEXT_SIZE 10
+#define NUM_MAPAS 4
 #define TRUE 1
 #define FALSE 0
+
+// constantes de infmons
+#define MAX_HABILIDADES_INFMON 3
+#define NIVEL_ESPACO_VAZIO -1
 #define DANO_INICIAL_LVL1 100
 #define DANO_POR_NIVEL 6
+#define VIDA_INICIAL_LVL1 275
+#define VIDA_POR_NIVEL 25
+#define DEFESA_INICIAL_LVL1 3
+#define DEFESA_POR_NIVEL 1
+#define XP_THRESHOLD_INICIAL 10
+#define XP_THRESHOLD_POR_NIVEL 20
+#define XP_GANHO_POR_LVL_INIMIGO 5
+
+// constantes de combate
+#define BUFF_TIPO 2
+#define NERF_TIPO 0.5
+#define TIPO_NEUTRO 1
+#define NIVEL_RAYANSAUR 15
+#define NIVEL_BOSS 20
+#define NIVEL_DENNISZARD 30
+#define NIVEL_THIAGOTOISE 50
+#define STD_ATK1_DMG 1
+#define STD_ATK2_DMG 1.1
+#define BUFF1_ATK2_DMG 1.15
+#define BUFF2_ATK2_DMG 1.25
+#define BUFF3_ATK2_DMG 1.4
+#define STD_ATK3_DMG 1.25
+#define BUFF1_ATK3_DMG 1.4
+#define BUFF2_ATK3_DMG 1.5
+#define BUFF3_ATK3_DMG 1.7
+
+// constantes de menu
+#define MAX_ITENS_MENU 3
+#define MAIN_MENU 0
+#define EXPLORACAO 1
+#define COMBATE 2
+#define PERDEU 3
+#define GANHOU 4
+#define MENU_COMBATE_PRINCIPAL 0
+#define MENU_ATAQUE 1
+#define MENU_TROCAR_INFMON 2
 
 // ESTRUTURAS
 //*********************************************************************************************************************
@@ -24,7 +68,7 @@
 // ataques dos infmons
 typedef struct
 {
-    char attack[20];
+    char attack[AVG_TEXT_SIZE];
     char type;
     float multiplier;
 } Attacks;
@@ -40,8 +84,8 @@ typedef struct
     int attack;
     int defense;
     char infmon_type;
-    char name[30];
-    Attacks habilities[3];
+    char name[AVG_TEXT_SIZE];
+    Attacks habilities[MAX_HABILIDADES_INFMON];
 } Infmon;
 
 // Estrutura que define as propriedades de uma entidade
@@ -80,13 +124,13 @@ typedef struct
 // estrutura com as informacoes do combate
 typedef struct
 {
-    char enemyLvl[9];
-    char playerMonLvl[9];
-    char enemyHealth[10];
-    char playerMonHealth[10];
-    char numStr[5];
-    char fightText[50];
-    char enemyText[50];
+    char enemyLvl[SMALL_TEXT_SIZE];
+    char playerMonLvl[SMALL_TEXT_SIZE];
+    char enemyHealth[SMALL_TEXT_SIZE];
+    char playerMonHealth[SMALL_TEXT_SIZE];
+    char numStr[SMALL_TEXT_SIZE / 2];
+    char fightText[AVG_TEXT_SIZE];
+    char enemyText[AVG_TEXT_SIZE];
     int infmonTurn; // 0 para o player, 1 para o inimigo
 } CombatStats;
 
@@ -103,7 +147,7 @@ typedef struct
 //*********************************************************************************************************************
 
 // recarrega o mapa diferente na matriz map
-void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos);
+void loadMap(GameInfo *game, char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos);
 
 // confirma se o player realmente quer sair
 int confirmExit(GameInfo *game, int *choose);
@@ -193,85 +237,86 @@ int main(void)
     game.must_exit = FALSE;
     game.randomInfmon = FALSE;
     game.infmonMenu = FALSE;
-    game.choosenInfmon = 0;  // inicia o jogo com primeiro infmon sendo escolhido para os combates
-    game.game_situation = 0; // inicia na tela de menu
-    game.menuCombat = 0;
+    game.choosenInfmon = 0;          // inicia o jogo com primeiro infmon sendo escolhido para os combates
+    game.game_situation = MAIN_MENU; // inicia na tela de menu
+    game.menuCombat = MENU_COMBATE_PRINCIPAL;
 
     // variaveis de combate
     combatInfo.fightText[0] = '\0';
+    combatInfo.enemyText[0] = '\0';
     combatInfo.infmonTurn = 0;
 
     // definindo o RayanSaur
-    rayanSaur.level = 15;
+    rayanSaur.level = NIVEL_RAYANSAUR;
     rayanSaur.infmon_type = 'g';
-    rayanSaur.max_health = rayanSaur.current_health_value = 275 + 25 * (rayanSaur.level - 1);
+    rayanSaur.max_health = rayanSaur.current_health_value = VIDA_INICIAL_LVL1 + VIDA_POR_NIVEL * (rayanSaur.level - 1);
     rayanSaur.attack = DANO_INICIAL_LVL1 + DANO_POR_NIVEL * (rayanSaur.level - 1);
-    rayanSaur.defense = 1 + (rayanSaur.level - 1);
+    rayanSaur.defense = DEFESA_INICIAL_LVL1 + DEFESA_POR_NIVEL * (rayanSaur.level - 1);
 
     strcpy(rayanSaur.name, "RayanSaur");
     strcpy(rayanSaur.habilities[0].attack, "FOTOSSÍNTESE");
     rayanSaur.habilities[0].type = 'g';
-    rayanSaur.habilities[0].multiplier = 1;
+    rayanSaur.habilities[0].multiplier = STD_ATK1_DMG;
     strcpy(rayanSaur.habilities[1].attack, "SOCO DIRETO");
     rayanSaur.habilities[1].type = 'n';
-    rayanSaur.habilities[1].type = 1.1;
+    rayanSaur.habilities[1].type = STD_ATK2_DMG;
     strcpy(rayanSaur.habilities[2].attack, "INSPIRAÇÃO PROGRAMADA");
     rayanSaur.habilities[2].type = 'g';
-    rayanSaur.habilities[2].type = 1.25;
+    rayanSaur.habilities[2].type = STD_ATK3_DMG;
 
     // definindo o boss1
-    boss1.level = 20;
+    boss1.level = NIVEL_BOSS;
     boss1.infmon_type = 'f';
-    boss1.max_health = boss1.current_health_value = 275 + 25 * (boss1.level - 1);
+    boss1.max_health = boss1.current_health_value = VIDA_INICIAL_LVL1 + VIDA_POR_NIVEL * (boss1.level - 1);
     boss1.attack = DANO_INICIAL_LVL1 + DANO_POR_NIVEL * (boss1.level - 1);
-    boss1.defense = 3 + (boss1.level - 1);
+    boss1.defense = DEFESA_INICIAL_LVL1 + DEFESA_POR_NIVEL * (boss1.level - 1);
 
     strcpy(boss1.name, "Caramelo do Vale");
     strcpy(boss1.habilities[0].attack, "LANÇA-CHAMAS");
     boss1.habilities[0].type = 'f';
-    boss1.habilities[0].multiplier = 1;
+    boss1.habilities[0].multiplier = STD_ATK1_DMG;
     strcpy(boss1.habilities[1].attack, "SOCO DIRETO");
     boss1.habilities[1].type = 'n';
-    boss1.habilities[1].type = 1.15;
+    boss1.habilities[1].type = BUFF1_ATK2_DMG;
     strcpy(boss1.habilities[2].attack, "EUJUROQUESOUHUMANO");
     boss1.habilities[2].type = 'f';
-    boss1.habilities[2].type = 1.35;
+    boss1.habilities[2].type = BUFF1_ATK3_DMG;
 
     // definindo o DennisZard
-    dennisZard.level = 30;
+    dennisZard.level = NIVEL_DENNISZARD;
     dennisZard.infmon_type = 'f';
-    dennisZard.max_health = dennisZard.current_health_value = 275 + 25 * (dennisZard.level - 1);
+    dennisZard.max_health = dennisZard.current_health_value = VIDA_INICIAL_LVL1 + VIDA_POR_NIVEL * (dennisZard.level - 1);
     dennisZard.attack = DANO_INICIAL_LVL1 + DANO_POR_NIVEL * (dennisZard.level - 1);
-    dennisZard.defense = 3 + (dennisZard.level - 1);
+    dennisZard.defense = DEFESA_INICIAL_LVL1 + DEFESA_POR_NIVEL * (dennisZard.level - 1);
 
     strcpy(dennisZard.name, "DennisZard");
     strcpy(dennisZard.habilities[0].attack, "LANÇA-CHAMAS");
     dennisZard.habilities[0].type = 'f';
-    dennisZard.habilities[0].multiplier = 1;
+    dennisZard.habilities[0].multiplier = STD_ATK1_DMG;
     strcpy(dennisZard.habilities[1].attack, "SOCO DIRETO");
     dennisZard.habilities[1].type = 'n';
-    dennisZard.habilities[1].type = 1.25;
+    dennisZard.habilities[1].type = BUFF2_ATK2_DMG;
     strcpy(dennisZard.habilities[2].attack, "LEGIBILIDADE");
     dennisZard.habilities[2].type = 'f';
-    dennisZard.habilities[2].type = 1.5;
+    dennisZard.habilities[2].type = BUFF2_ATK3_DMG;
 
     // definindo o thiagosToise
-    thiagosToise.level = 50;
+    thiagosToise.level = NIVEL_THIAGOTOISE;
     thiagosToise.infmon_type = 'w';
-    thiagosToise.max_health = thiagosToise.current_health_value = 275 + 25 * (thiagosToise.level - 1);
-    thiagosToise.attack = DANO_INICIAL_LVL1 + 2 * (thiagosToise.level - 1);
-    thiagosToise.defense = 3 + (thiagosToise.level - 1);
+    thiagosToise.max_health = thiagosToise.current_health_value = VIDA_INICIAL_LVL1 + VIDA_POR_NIVEL * (thiagosToise.level - 1);
+    thiagosToise.attack = DANO_INICIAL_LVL1 + DANO_POR_NIVEL * (thiagosToise.level - 1);
+    thiagosToise.defense = DEFESA_INICIAL_LVL1 + DEFESA_POR_NIVEL * (thiagosToise.level - 1);
 
     strcpy(thiagosToise.name, "ThiagosToise");
     strcpy(thiagosToise.habilities[0].attack, "JATO D'ÁGUA");
     thiagosToise.habilities[0].type = 'w';
-    thiagosToise.habilities[0].multiplier = 1;
+    thiagosToise.habilities[0].multiplier = STD_ATK1_DMG;
     strcpy(thiagosToise.habilities[1].attack, "SOCO DIRETO");
     thiagosToise.habilities[1].type = 'n';
-    thiagosToise.habilities[1].type = 1.4;
+    thiagosToise.habilities[1].type = BUFF3_ATK2_DMG;
     strcpy(thiagosToise.habilities[2].attack, "CHUVA DE NOTA");
     thiagosToise.habilities[2].type = 'w';
-    thiagosToise.habilities[2].type = 1.7;
+    thiagosToise.habilities[2].type = BUFF3_ATK3_DMG;
     //---------------------------------------------------------------------------------------------------------------------
 
     // VARIÁVEIS
@@ -313,7 +358,6 @@ int main(void)
     // Gera o mapa
     //---------------------------------------------------------------------------------------------------------------------
     SetRandomSeed(time(NULL));
-    loadMap(map, mapNum, &player, 1);
     //---------------------------------------------------------------------------------------------------------------------
 
     // Vínculo principal do jogo
@@ -373,20 +417,20 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         // Main menu
         //---------------------------------------------------------------------------------------------------------------------
-        else if (game.game_situation == 0)
+        else if (game.game_situation == MAIN_MENU)
         {
             switch (mainMenu(&game, &menuChooseVertical))
             {
             case 1:
                 loadGame(&saveData, &player, &mapNum);
-                loadMap(map, mapNum, &player, 0);
+                loadMap(&game, map, mapNum, &player, 0);
                 break;
 
             case 2:
                 if (!newGame(&saveData))
                 {
                     loadGame(&saveData, &player, &mapNum);
-                    loadMap(map, mapNum, &player, 1);
+                    loadMap(&game, map, mapNum, &player, 1);
                     saveGame(&saveData, player, mapNum);
                 }
                 break;
@@ -396,7 +440,7 @@ int main(void)
         //---------------------------------------------------------------------------------------------------------------------
         // Exploração
         //---------------------------------------------------------------------------------------------------------------------
-        else if (game.game_situation == 1)
+        else if (game.game_situation == EXPLORACAO)
         {
             exploring(&game, &player, &usedTexture, map, mapNum);
         }
@@ -405,7 +449,7 @@ int main(void)
         //    Em combate
         //--------------------------------------------------------------------------------------------------------------------
 
-        else if (game.game_situation == 2)
+        else if (game.game_situation == COMBATE)
         {
             if (game.randomInfmon == TRUE)
             {
@@ -430,6 +474,10 @@ int main(void)
                 {
                     enemy = thiagosToise;
                 }
+                else
+                {
+                    enemy = rayanSaur;
+                }
                 game.randomInfmon = 2;
             }
             else
@@ -438,12 +486,18 @@ int main(void)
             }
         }
 
-        else if (game.game_situation == 3)
+        //--------------------------------------------------------------------------------------------------------------------
+        //    Fim de jogo: perdeu
+        //--------------------------------------------------------------------------------------------------------------------
+        else if (game.game_situation == PERDEU)
         {
             loseGame(&game, &menuChooseVertical);
         }
 
-        else if (game.game_situation == 4)
+        //--------------------------------------------------------------------------------------------------------------------
+        //    Fim de jogo: ganhou
+        //--------------------------------------------------------------------------------------------------------------------
+        else if (game.game_situation == GANHOU)
         {
             wonGame(&game, &menuChooseVertical);
         }
@@ -479,12 +533,12 @@ int main(void)
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 // recarrega o mapa diferente na matriz map
-void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos)
+void loadMap(GameInfo *game, char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlayerPos)
 {
     int i, j;
     int transpose[ROWS][COLUMNS];
     char numStr[3];
-    char fileName[20] = "maps/Mapa";
+    char fileName[AVG_TEXT_SIZE] = "maps/Mapa";
     FILE *arqMap;
 
     sprintf(numStr, "%d", numMap);
@@ -496,7 +550,7 @@ void loadMap(char map[COLUMNS][ROWS], int numMap, Entity *player, int alteraPlay
 
     if (arqMap == NULL)
     {
-        printf("Nao foi achado nenhum mapa com nome %s", fileName);
+        game->game_situation = GANHOU;
     }
     else
     {
@@ -598,7 +652,7 @@ int mainMenu(GameInfo *game, int *choose)
     {
         if (*choose == 0)
         {
-            *choose = 2;
+            *choose = MAX_ITENS_MENU - 1;
         }
         else
         {
@@ -609,7 +663,7 @@ int mainMenu(GameInfo *game, int *choose)
     // desce a seleção do botão do menu com as setas
     if (IsKeyPressed(KEY_DOWN))
     {
-        if (*choose == 2)
+        if (*choose == MAX_ITENS_MENU - 1)
         {
             *choose = 0;
         }
@@ -621,12 +675,12 @@ int mainMenu(GameInfo *game, int *choose)
 
     if (IsKeyPressed(KEY_C) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
-        game->game_situation = 1;
+        game->game_situation = EXPLORACAO;
         return 1;
     }
     if (IsKeyPressed(KEY_N) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
-        game->game_situation = 1;
+        game->game_situation = EXPLORACAO;
         *choose = 0;
         return 2;
     }
@@ -704,13 +758,13 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     if (IsKeyPressed(KEY_L) || (IsKeyPressed(KEY_ENTER) && *choose == 3))
     {
         loadGame(data, player, numMap);
-        loadMap(map, *numMap, player, 0);
+        loadMap(game, map, *numMap, player, 0);
         *choose = 0;
         game->game_is_paused = FALSE;
     }
     if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 4))
     {
-        game->game_situation = 0;
+        game->game_situation = MAIN_MENU;
         game->game_is_paused = FALSE;
         *choose = 0;
     }
@@ -730,10 +784,10 @@ void pauseGame(GameInfo *game, SaveInfo *data, Entity *player, int *numMap, int 
     }
 
     // desenha o quadrado de escolha
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % 3), 910, 10, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * ((*choose) % 3), 910, 10, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % 3), 10, 160, WHITE);
-    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * ((*choose) % 3), 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % MAX_ITENS_MENU), 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 450 + 150 * ((*choose) % MAX_ITENS_MENU), 910, 10, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 - 450, 300 + 150 * ((*choose) % MAX_ITENS_MENU), 10, 160, WHITE);
+    DrawRectangle(SCREEN_WIDTH / 2 + 450, 300 + 150 * ((*choose) % MAX_ITENS_MENU), 10, 160, WHITE);
 
     // escreve os textos de opcoes
     if (*choose <= 2)
@@ -769,7 +823,7 @@ void exploring(GameInfo *game, Entity *player, Maps *mapa, char map[COLUMNS][ROW
         {
             if (randomEncounter(game))
             {
-                game->game_situation = 2; // entra em combate
+                game->game_situation = COMBATE; // entra em combate
             }
         }
     }
@@ -858,16 +912,16 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
 
     if (enemy->current_health_value <= 0)
     {
-        if (enemy->level == 15 || enemy->level == 20 || enemy->level == 30 || enemy->level == 50)
+        if (enemy->level == NIVEL_RAYANSAUR || enemy->level == NIVEL_BOSS || enemy->level == NIVEL_DENNISZARD || enemy->level == NIVEL_THIAGOTOISE)
         {
-            if (*numMap == 4)
+            if (*numMap == NUM_MAPAS)
             {
-                game->game_situation = 4;
+                game->game_situation = GANHOU;
             }
             else
             {
                 *numMap += 1;
-                loadMap(map, *numMap, player, 1);
+                loadMap(game, map, *numMap, player, 1);
                 saveGame(data, *player, *numMap);
                 loadGame(data, player, numMap);
             }
@@ -877,8 +931,8 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         combatInfo->infmonTurn = 0;
         game->randomInfmon = FALSE;
         if (enemy->level != 50)
-            game->game_situation = 1;
-        game->menuCombat = 0;
+            game->game_situation = EXPLORACAO;
+        game->menuCombat = MENU_COMBATE_PRINCIPAL;
         *chooseH = 0;
         *chooseV = 0;
         combatInfo->fightText[0] = '\0';
@@ -886,20 +940,20 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         healInfmon(player); // heala os infmons
 
         // upa os infmons, se eles existem
-        if (player->mon[0].level != -1)
+        if (player->mon[0].level != NIVEL_ESPACO_VAZIO)
         {
-            player->mon[0].current_xp += 5 * enemy->level;
+            player->mon[0].current_xp += XP_GANHO_POR_LVL_INIMIGO * enemy->level;
             levelUpInfmon(player, 0);
         }
 
-        if (player->mon[1].level != -1)
+        if (player->mon[1].level != NIVEL_ESPACO_VAZIO)
         {
-            player->mon[1].current_xp += 5 * enemy->level;
+            player->mon[1].current_xp += XP_GANHO_POR_LVL_INIMIGO * enemy->level;
             levelUpInfmon(player, 1);
         }
-        if (player->mon[2].level != -1)
+        if (player->mon[2].level != NIVEL_ESPACO_VAZIO)
         {
-            player->mon[2].current_xp += 5 * enemy->level;
+            player->mon[2].current_xp += XP_GANHO_POR_LVL_INIMIGO * enemy->level;
             levelUpInfmon(player, 2);
         }
     }
@@ -907,11 +961,11 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     // verifica se o player morreu
     if (player->mon[game->choosenInfmon].current_health_value <= 0)
     {
-        if (player->mon[(game->choosenInfmon + 1) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 1) % 3].level != -1)
+        if (player->mon[(game->choosenInfmon + 1) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 1) % 3].level != NIVEL_ESPACO_VAZIO)
         {
             game->choosenInfmon = (game->choosenInfmon + 1) % 3;
         }
-        else if (player->mon[(game->choosenInfmon + 2) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 2) % 3].level != -1)
+        else if (player->mon[(game->choosenInfmon + 2) % 3].current_health_value > 0 && player->mon[(game->choosenInfmon + 2) % 3].level != NIVEL_ESPACO_VAZIO)
         {
             game->choosenInfmon = (game->choosenInfmon + 2) % 3;
         }
@@ -919,14 +973,14 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         {
             strcpy(combatInfo->fightText, "");
             strcpy(combatInfo->enemyText, "");
-            game->game_situation = 3;
+            game->game_situation = PERDEU;
         }
     }
 
     // tenta capturar o infmon ininmigo
-    if (IsKeyPressed(KEY_C) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 0)) && game->menuCombat == 0))
+    if (IsKeyPressed(KEY_C) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 0)) && game->menuCombat == MENU_COMBATE_PRINCIPAL))
     {
-        if (enemy->level == 15 || enemy->level == 20 || enemy->level == 30 || enemy->level == 50)
+        if (enemy->level == NIVEL_RAYANSAUR || enemy->level == NIVEL_BOSS || enemy->level == NIVEL_DENNISZARD || enemy->level == NIVEL_THIAGOTOISE)
         {
             strcpy(combatInfo->fightText, "Não é possível capturar este infmon");
         }
@@ -941,8 +995,8 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
                     {
                         combatInfo->infmonTurn = 0;
                         game->randomInfmon = FALSE;
-                        game->game_situation = 1;
-                        game->menuCombat = 0;
+                        game->game_situation = EXPLORACAO;
+                        game->menuCombat = MENU_COMBATE_PRINCIPAL;
                         *chooseH = 0;
                         *chooseV = 0;
                         combatInfo->fightText[0] = '\0';
@@ -966,7 +1020,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     }
 
     // ataca o inimigo
-    if (IsKeyPressed(KEY_ENTER) && game->menuCombat == 1)
+    if (IsKeyPressed(KEY_ENTER) && game->menuCombat == MENU_ATAQUE)
     {
         if (*chooseH == 0 && *chooseV == 0)
         {
@@ -989,19 +1043,19 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     }
 
     // troca de infmon
-    if (IsKeyPressed(KEY_ENTER) && game->menuCombat == 2)
+    if (IsKeyPressed(KEY_ENTER) && game->menuCombat == MENU_TROCAR_INFMON)
     {
-        if (*chooseH == 0 && *chooseV == 0 && player->mon[0].level != -1)
+        if (*chooseH == 0 && *chooseV == 0 && player->mon[0].level != NIVEL_ESPACO_VAZIO)
         {
             game->choosenInfmon = 0;
             combatInfo->infmonTurn = 1;
         }
-        else if (*chooseH == 1 && *chooseV == 0 && player->mon[1].level != -1)
+        else if (*chooseH == 1 && *chooseV == 0 && player->mon[1].level != NIVEL_ESPACO_VAZIO)
         {
             game->choosenInfmon = 1;
             combatInfo->infmonTurn = 1;
         }
-        else if (*chooseH == 0 && *chooseV == 1 && player->mon[2].level != -1)
+        else if (*chooseH == 0 && *chooseV == 1 && player->mon[2].level != NIVEL_ESPACO_VAZIO)
         {
             game->choosenInfmon = 2;
             combatInfo->infmonTurn = 1;
@@ -1009,29 +1063,29 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     }
 
     // abre o submenu de ataque
-    if (IsKeyPressed(KEY_A) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 0)) && game->menuCombat == 0))
+    if (IsKeyPressed(KEY_A) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 0)) && game->menuCombat == MENU_COMBATE_PRINCIPAL))
     {
-        game->menuCombat = 1;
+        game->menuCombat = MENU_ATAQUE;
     }
 
     // abre o submenu de seleção de infmons
-    if (IsKeyPressed(KEY_T) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 1)) && game->menuCombat == 0))
+    if (IsKeyPressed(KEY_T) || ((IsKeyPressed(KEY_ENTER) && (*chooseH == 0 && *chooseV == 1)) && game->menuCombat == MENU_COMBATE_PRINCIPAL))
     {
-        game->menuCombat = 2;
+        game->menuCombat = MENU_TROCAR_INFMON;
     }
 
     // foge do combate, precisa ficar antes do if da opção de voltar pro menu padrão de combate
-    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1) && game->menuCombat == 0))
+    if (IsKeyPressed(KEY_R) || (IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1) && game->menuCombat == MENU_COMBATE_PRINCIPAL))
     {
-        if (enemy->level == 15 || enemy->level == 20 || enemy->level == 30 || enemy->level == 50)
+        if (enemy->level == NIVEL_RAYANSAUR || enemy->level == NIVEL_BOSS || enemy->level == NIVEL_DENNISZARD || enemy->level == NIVEL_THIAGOTOISE)
         {
             strcpy(combatInfo->fightText, "Você não tem para onde fugir");
         }
         else
         {
             game->randomInfmon = FALSE;
-            game->game_situation = 1;
-            game->menuCombat = 0;
+            game->game_situation = EXPLORACAO;
+            game->menuCombat = MENU_COMBATE_PRINCIPAL;
             *chooseH = 0;
             *chooseV = 0;
             strcpy(combatInfo->fightText, "");
@@ -1041,9 +1095,9 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     }
 
     // volta para o menu padrao de combate
-    if ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)) && (game->menuCombat == 1 || game->menuCombat == 2))
+    if ((IsKeyPressed(KEY_ENTER) && (*chooseH == 1 && *chooseV == 1)) && (game->menuCombat == MENU_ATAQUE || game->menuCombat == MENU_TROCAR_INFMON))
     {
-        game->menuCombat = 0;
+        game->menuCombat = MENU_COMBATE_PRINCIPAL;
     }
 
     BeginDrawing();
@@ -1053,7 +1107,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
 
     // texto do combate
     DrawText(combatInfo->fightText, 100, 880, 30, BLACK);
-    DrawText(combatInfo->enemyText, 1300, 150, 30, BLACK);
+    DrawText(combatInfo->enemyText, 1250, 150, 30, BLACK);
 
     // menu de opcoes
     DrawRectangle(1180, 620, SCREEN_WIDTH - 900, 10, BLACK);
@@ -1119,7 +1173,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
     DrawRectangle(335, 809, 194 * ((float)player->mon[game->choosenInfmon].current_health_value / (float)player->mon[game->choosenInfmon].max_health), 20, GREEN);
 
     // desenha o oponente ----------------------------------------
-    if (enemy->level == 15 || enemy->level == 20 || enemy->level == 30 || enemy->level == 50)
+    if (enemy->level == NIVEL_RAYANSAUR || enemy->level == NIVEL_BOSS || enemy->level == NIVEL_DENNISZARD || enemy->level == NIVEL_THIAGOTOISE)
     {
         DrawTexture(mapInfo->bossFight, 1500, 300, WHITE);
     }
@@ -1219,7 +1273,7 @@ void loseGame(GameInfo *game, int *choose)
 
     if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
-        game->game_situation = 0;
+        game->game_situation = MAIN_MENU;
     }
     if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
@@ -1276,7 +1330,7 @@ void wonGame(GameInfo *game, int *choose)
 
     if (IsKeyPressed(KEY_B) || (IsKeyPressed(KEY_ENTER) && *choose == 0))
     {
-        game->game_situation = 0;
+        game->game_situation = MAIN_MENU;
     }
     if (IsKeyPressed(KEY_Q) || IsKeyPressed(KEY_ESCAPE) || (IsKeyPressed(KEY_ENTER) && *choose == 1))
     {
@@ -1303,6 +1357,7 @@ void wonGame(GameInfo *game, int *choose)
     EndDrawing();
 }
 
+// cura os infmons
 void healInfmon(Entity *player)
 {
     player->mon[0].current_health_value = player->mon[0].max_health;
@@ -1314,7 +1369,7 @@ void healInfmon(Entity *player)
 int levelUpInfmon(Entity *player, int selectedInfmon)
 {
     // texto de levelup
-    char levelUpText[20] = "";
+    char levelUpText[AVG_TEXT_SIZE] = "";
 
     strcat(levelUpText, "Seu ");
     strcat(levelUpText, player->mon[selectedInfmon].name);
@@ -1325,10 +1380,10 @@ int levelUpInfmon(Entity *player, int selectedInfmon)
         // melhora os atributos
         player->mon[selectedInfmon].level++;
         player->mon[selectedInfmon].attack += DANO_POR_NIVEL;
-        player->mon[selectedInfmon].defense++;
+        player->mon[selectedInfmon].defense += DEFESA_POR_NIVEL;
         player->mon[selectedInfmon].current_xp -= player->mon[selectedInfmon].level_up_xp_threshold;
-        player->mon[selectedInfmon].max_health += 25;
-        player->mon[selectedInfmon].level_up_xp_threshold += 20;
+        player->mon[selectedInfmon].max_health += VIDA_POR_NIVEL;
+        player->mon[selectedInfmon].level_up_xp_threshold += XP_THRESHOLD_POR_NIVEL;
 
         // tela de que upou
         BeginDrawing();
@@ -1344,6 +1399,7 @@ int levelUpInfmon(Entity *player, int selectedInfmon)
     return 0;
 }
 
+// pega o quanto de dano que vai dar com base no tipo
 float getTypeDamageMultiplier(char attackingType, char defenderType)
 {
     float val;
@@ -1354,15 +1410,15 @@ float getTypeDamageMultiplier(char attackingType, char defenderType)
         switch (defenderType)
         {
         case 'f':
-            val = 1;
+            val = TIPO_NEUTRO;
             break;
 
         case 'w':
-            val = 0.5;
+            val = NERF_TIPO;
             break;
 
         case 'g':
-            val = 2;
+            val = BUFF_TIPO;
         }
         break;
 
@@ -1370,15 +1426,15 @@ float getTypeDamageMultiplier(char attackingType, char defenderType)
         switch (defenderType)
         {
         case 'f':
-            val = 2;
+            val = BUFF_TIPO;
             break;
 
         case 'w':
-            val = 1;
+            val = TIPO_NEUTRO;
             break;
 
         case 'g':
-            val = 0.5;
+            val = NERF_TIPO;
         }
         break;
 
@@ -1386,20 +1442,20 @@ float getTypeDamageMultiplier(char attackingType, char defenderType)
         switch (defenderType)
         {
         case 'f':
-            val = 0.5;
+            val = NERF_TIPO;
             break;
 
         case 'w':
-            val = 2;
+            val = BUFF_TIPO;
             break;
 
         case 'g':
-            val = 1;
+            val = TIPO_NEUTRO;
         }
         break;
 
     case 'n':
-        val = 1;
+        val = TIPO_NEUTRO;
     }
 
     return val;
@@ -1469,6 +1525,7 @@ void drawMap(Maps *m, char map[COLUMNS][ROWS], int numMap)
     }
 }
 
+// abre o menu de infmons
 void openInfmonMenu(GameInfo *game, Entity *player, int *choose)
 {
     int i = 0;
@@ -1512,7 +1569,7 @@ void openInfmonMenu(GameInfo *game, Entity *player, int *choose)
 
     for (i = 0; i < 3; i++)
     {
-        if (player->mon[i].level != -1)
+        if (player->mon[i].level != NIVEL_ESPACO_VAZIO)
         {
             DrawText(player->mon[i].name, SCREEN_WIDTH / 2 - 200, 350 + i * 150, 50, WHITE);
         }
@@ -1586,8 +1643,8 @@ int newGame(SaveInfo *data)
 
     // cria as informacoes iniciais do player e do mapa ao criar um save novo
     data->mapNum = 1;
-    data->Player_info.mon[1].level = -1;
-    data->Player_info.mon[2].level = -1;
+    data->Player_info.mon[1].level = NIVEL_ESPACO_VAZIO;
+    data->Player_info.mon[2].level = NIVEL_ESPACO_VAZIO;
     strcpy(data->Player_info.mon[1].name, "");
     strcpy(data->Player_info.mon[2].name, "");
 
@@ -1596,10 +1653,10 @@ int newGame(SaveInfo *data)
     // define o infmon inicial do player
     data->Player_info.mon[0].current_xp = 0;
     data->Player_info.mon[0].level = 1;
-    data->Player_info.mon[0].max_health = data->Player_info.mon[0].current_health_value = 275;
-    data->Player_info.mon[0].level_up_xp_threshold = 10;
+    data->Player_info.mon[0].max_health = data->Player_info.mon[0].current_health_value = VIDA_INICIAL_LVL1;
+    data->Player_info.mon[0].level_up_xp_threshold = XP_THRESHOLD_INICIAL;
     data->Player_info.mon[0].attack = DANO_INICIAL_LVL1;
-    data->Player_info.mon[0].defense = 3;
+    data->Player_info.mon[0].defense = DEFESA_INICIAL_LVL1;
     data->Player_info.mon[0].infmon_type = 'f';
     strcpy(data->Player_info.mon[0].name, "Fogomon");
 
@@ -1608,10 +1665,10 @@ int newGame(SaveInfo *data)
     data->Player_info.mon[0].habilities[0].multiplier = 1;
     strcpy(data->Player_info.mon[0].habilities[1].attack, "SOCO DIRETO");
     data->Player_info.mon[0].habilities[1].type = 'n';
-    data->Player_info.mon[0].habilities[1].multiplier = 1.1;
+    data->Player_info.mon[0].habilities[1].multiplier = STD_ATK2_DMG;
     strcpy(data->Player_info.mon[0].habilities[2].attack, "BAFO DE FOGO");
     data->Player_info.mon[0].habilities[2].type = 'f';
-    data->Player_info.mon[0].habilities[2].multiplier = 1.25;
+    data->Player_info.mon[0].habilities[2].multiplier = STD_ATK3_DMG;
 
     saveArq = fopen("saves/save.bin", "wb");
 
@@ -1628,7 +1685,7 @@ int newGame(SaveInfo *data)
     return 0;
 }
 
-// Função que determina se jogador está passando por zona de encontro aleatório
+// Função que gera encontro aleatório
 int randomEncounter(GameInfo *game)
 {
     int battle_start = FALSE;
@@ -1642,7 +1699,7 @@ int randomEncounter(GameInfo *game)
     return battle_start;
 }
 
-// Função que gera encontro aleatório
+// Função que determina se jogador está passando por zona de encontro aleatório
 int movingThroughGrass(int pX, int pY, char map[COLUMNS][ROWS])
 {
 
@@ -1660,12 +1717,10 @@ Infmon generateRandomInfmon()
     Infmon randomEnemy;
     int randomValueToType;
 
-    randomEnemy.current_xp = 0;
     randomEnemy.level = GetRandomValue(1, 10);
-    randomEnemy.max_health = randomEnemy.current_health_value = 275 + 25 * (randomEnemy.level - 1);
-    randomEnemy.level_up_xp_threshold = 10 + 20 * randomEnemy.level;
+    randomEnemy.max_health = randomEnemy.current_health_value = VIDA_INICIAL_LVL1 + VIDA_POR_NIVEL * (randomEnemy.level - 1);
     randomEnemy.attack = DANO_INICIAL_LVL1 + DANO_POR_NIVEL * (randomEnemy.level - 1);
-    randomEnemy.defense = 3 + (randomEnemy.level - 1);
+    randomEnemy.defense = DEFESA_INICIAL_LVL1 + (randomEnemy.level - 1);
 
     randomValueToType = GetRandomValue(1, 3);
 
@@ -1679,10 +1734,10 @@ Infmon generateRandomInfmon()
         randomEnemy.habilities[0].multiplier = 1;
         strcpy(randomEnemy.habilities[1].attack, "TAPA NA CARA");
         randomEnemy.habilities[1].type = 'n';
-        randomEnemy.habilities[1].multiplier = 1.1;
+        randomEnemy.habilities[1].multiplier = STD_ATK2_DMG;
         strcpy(randomEnemy.habilities[2].attack, "LANÇA-CHAMAS");
         randomEnemy.habilities[2].type = 'f';
-        randomEnemy.habilities[2].multiplier = 1.25;
+        randomEnemy.habilities[2].multiplier = STD_ATK3_DMG;
         break;
 
     case 2:
@@ -1693,10 +1748,10 @@ Infmon generateRandomInfmon()
         randomEnemy.habilities[0].multiplier = 1;
         strcpy(randomEnemy.habilities[1].attack, "SOCO DIRETO");
         randomEnemy.habilities[1].type = 'n';
-        randomEnemy.habilities[1].multiplier = 1.1;
+        randomEnemy.habilities[1].multiplier = STD_ATK2_DMG;
         strcpy(randomEnemy.habilities[2].attack, "CACHOEIRA");
         randomEnemy.habilities[2].type = 'w';
-        randomEnemy.habilities[2].multiplier = 1.25;
+        randomEnemy.habilities[2].multiplier = STD_ATK3_DMG;
         break;
 
     case 3:
@@ -1707,10 +1762,10 @@ Infmon generateRandomInfmon()
         randomEnemy.habilities[0].multiplier = 1;
         strcpy(randomEnemy.habilities[1].attack, "SOCO DIRETO");
         randomEnemy.habilities[1].type = 'n';
-        randomEnemy.habilities[1].multiplier = 1.1;
+        randomEnemy.habilities[1].multiplier = STD_ATK2_DMG;
         strcpy(randomEnemy.habilities[2].attack, "POLINIZAÇÃO");
         randomEnemy.habilities[2].type = 'g';
-        randomEnemy.habilities[2].multiplier = 1.25;
+        randomEnemy.habilities[2].multiplier = STD_ATK3_DMG;
         break;
     }
 
@@ -1735,7 +1790,7 @@ int addInfmon(Entity *player, Infmon enemy)
 
     for (i = 0; i < 3; i++)
     {
-        if (player->mon[i].level == -1)
+        if (player->mon[i].level == NIVEL_ESPACO_VAZIO)
         {
             player->mon[i] = enemy;
             return 1;
@@ -1774,7 +1829,7 @@ int movePlayer(GameInfo *game, int *pX, int *pY, char map[COLUMNS][ROWS])
     }
     if (map[*pX / SQUARE_WIDTH][(*pY) / SQUARE_WIDTH] == 'E')
     {
-        game->game_situation = 2;
+        game->game_situation = COMBATE;
     }
 
     return moving;
