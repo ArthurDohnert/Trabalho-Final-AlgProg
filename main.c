@@ -936,6 +936,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         *chooseH = 0;
         *chooseV = 0;
         combatInfo->fightText[0] = '\0';
+        combatInfo->enemyText[0] = '\0';
 
         healInfmon(player); // heala os infmons
 
@@ -1000,6 +1001,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
                         *chooseH = 0;
                         *chooseV = 0;
                         combatInfo->fightText[0] = '\0';
+                        combatInfo->enemyText[0] = '\0';
                         healInfmon(player);
                     }
                     else
@@ -1026,19 +1028,19 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
         {
             combatInfo->infmonTurn = 1;
             typeMultiplier = getTypeDamageMultiplier(player->mon[game->choosenInfmon].habilities[0].type, enemy->infmon_type);
-            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[0].multiplier * player->mon[game->choosenInfmon].attack) / enemy->defense;
+            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[0].multiplier * player->mon[game->choosenInfmon].attack / enemy->defense);
         }
         else if (*chooseH == 1 && *chooseV == 0)
         {
             combatInfo->infmonTurn = 1;
             typeMultiplier = getTypeDamageMultiplier(player->mon[game->choosenInfmon].habilities[1].type, enemy->infmon_type);
-            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[1].multiplier * player->mon[game->choosenInfmon].attack) / enemy->defense;
+            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[1].multiplier * player->mon[game->choosenInfmon].attack / enemy->defense);
         }
         else if (*chooseH == 0 && *chooseV == 1)
         {
             combatInfo->infmonTurn = 1;
             typeMultiplier = getTypeDamageMultiplier(player->mon[game->choosenInfmon].habilities[2].type, enemy->infmon_type);
-            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[2].multiplier * player->mon[game->choosenInfmon].attack) / enemy->defense;
+            enemy->current_health_value -= (int)(typeMultiplier * player->mon[game->choosenInfmon].habilities[2].multiplier * player->mon[game->choosenInfmon].attack / enemy->defense);
         }
     }
 
@@ -1107,7 +1109,7 @@ void combat(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *combatIn
 
     // texto do combate
     DrawText(combatInfo->fightText, 100, 880, 30, BLACK);
-    DrawText(combatInfo->enemyText, 1250, 150, 30, BLACK);
+    DrawText(combatInfo->enemyText, 1150, 150, 30, BLACK);
 
     // menu de opcoes
     DrawRectangle(1180, 620, SCREEN_WIDTH - 900, 10, BLACK);
@@ -1223,19 +1225,19 @@ void enemyAttack(GameInfo *game, Entity *player, Infmon *enemy, CombatStats *com
     {
     case 1:
         damageMultiplier = getTypeDamageMultiplier(enemy->habilities[0].type, player->mon[game->choosenInfmon].infmon_type);
-        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[0].multiplier * enemy->attack) / player->mon[game->choosenInfmon].defense;
+        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[0].multiplier * enemy->attack / player->mon[game->choosenInfmon].defense);
         strcat(combatInfo->enemyText, enemy->habilities[0].attack);
         break;
 
     case 2:
         damageMultiplier = getTypeDamageMultiplier(enemy->habilities[1].type, player->mon[game->choosenInfmon].infmon_type);
-        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[1].multiplier * enemy->attack) / player->mon[game->choosenInfmon].defense;
+        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[1].multiplier * enemy->attack / player->mon[game->choosenInfmon].defense);
         strcat(combatInfo->enemyText, enemy->habilities[1].attack);
         break;
 
     case 3:
         damageMultiplier = getTypeDamageMultiplier(enemy->habilities[2].type, player->mon[game->choosenInfmon].infmon_type);
-        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[2].multiplier * enemy->attack) / player->mon[game->choosenInfmon].defense;
+        player->mon[game->choosenInfmon].current_health_value -= (int)(damageMultiplier * enemy->habilities[2].multiplier * enemy->attack / player->mon[game->choosenInfmon].defense);
         strcat(combatInfo->enemyText, enemy->habilities[2].attack);
         break;
     }
